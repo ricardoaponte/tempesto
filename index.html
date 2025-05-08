@@ -139,1249 +139,1264 @@
     </style>
 </head>
 <body>
-    <div id="ui">
-        <div id="score">SCORE: 0</div>
-        <div id="lives">LIVES: 3</div>
+<div id="ui">
+    <div id="score">SCORE: 0</div>
+    <div id="lives">LIVES: 3</div>
+</div>
+
+<div id="power-ups">
+    <div id="active-power">POWER: NONE</div>
+</div>
+
+<div id="level-indicator">
+    <div id="current-level">LEVEL: 1</div>
+</div>
+
+<div id="pause-screen">PAUSED</div>
+
+<div id="instructions">
+    ARROWS: MOVE | SPACE: FIRE | P: PAUSE
+</div>
+
+<div id="game-over">
+    <h1>GAME OVER</h1>
+    <div id="final-score"></div>
+    <button id="restart-button">RESTART</button>
+</div>
+
+<div id="level-complete">
+    <h1>LEVEL COMPLETE</h1>
+    <div id="level-score"></div>
+    <button id="next-level-button">NEXT LEVEL</button>
+</div>
+
+<div id="menu">
+    <h1>TEMPEST CLONE</h1>
+    <div>
+        <label for="speed-select">PLAYER SPEED:</label>
+        <select id="speed-select">
+            <option value="slow">SLOW</option>
+            <option value="normal" selected>NORMAL</option>
+            <option value="fast">FAST</option>
+        </select>
     </div>
-
-    <div id="power-ups">
-        <div id="active-power">POWER: NONE</div>
+    <div>
+        <label for="difficulty-select">DIFFICULTY:</label>
+        <select id="difficulty-select">
+            <option value="easy">EASY</option>
+            <option value="medium" selected>MEDIUM</option>
+            <option value="hard">HARD</option>
+        </select>
     </div>
-
-    <div id="level-indicator">
-        <div id="current-level">LEVEL: 1</div>
+    <div>
+        <label for="web-type-select">WEB TYPE:</label>
+        <select id="web-type-select">
+            <option value="circle" selected>CIRCLE</option>
+            <option value="square">SQUARE</option>
+            <option value="triangle">TRIANGLE</option>
+            <option value="pentagon">PENTAGON</option>
+            <option value="hexagon">HEXAGON</option>
+            <option value="octagon">OCTAGON</option>
+            <option value="random">RANDOM</option>
+        </select>
     </div>
+    <button id="start-button">START GAME</button>
+</div>
 
-    <div id="pause-screen">PAUSED</div>
+<!-- Include Three.js library -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
-    <div id="instructions">
-        ARROWS: MOVE | SPACE: FIRE | P: PAUSE
-    </div>
+<script>
+    // --- Global Variables ---
+    let scene, camera, renderer;
+    let webMesh;
+    let player;
+    const projectiles = [];
+    const enemies = [];
+    const powerUps = [];
+    const explosions = [];
+    const keyState = {};
 
-    <div id="game-over">
-        <h1>GAME OVER</h1>
-        <div id="final-score"></div>
-        <button id="restart-button">RESTART</button>
-    </div>
+    // Game State
+    let gameState = 'menu'; // 'menu', 'playing', 'paused', 'gameover', 'levelcomplete'
+    let isPaused = false;
 
-    <div id="level-complete">
-        <h1>LEVEL COMPLETE</h1>
-        <div id="level-score"></div>
-        <button id="next-level-button">NEXT LEVEL</button>
-    </div>
+    // Web Configuration
+    let NUM_LANES = 16;
+    const WEB_DEPTH = 40;
+    const WEB_RADIUS = 10;
+    let LANE_ANGLE_STEP = (Math.PI * 2) / NUM_LANES;
+    let webType = 'circle';
 
-    <div id="menu">
-        <h1>TEMPEST CLONE</h1>
-        <div>
-            <label for="speed-select">PLAYER SPEED:</label>
-            <select id="speed-select">
-                <option value="slow">SLOW</option>
-                <option value="normal" selected>NORMAL</option>
-                <option value="fast">FAST</option>
-            </select>
-        </div>
-        <div>
-            <label for="difficulty-select">DIFFICULTY:</label>
-            <select id="difficulty-select">
-                <option value="easy">EASY</option>
-                <option value="medium" selected>MEDIUM</option>
-                <option value="hard">HARD</option>
-            </select>
-        </div>
-        <div>
-            <label for="web-type-select">WEB TYPE:</label>
-            <select id="web-type-select">
-                <option value="circle" selected>CIRCLE</option>
-                <option value="square">SQUARE</option>
-                <option value="triangle">TRIANGLE</option>
-                <option value="random">RANDOM</option>
-            </select>
-        </div>
-        <button id="start-button">START GAME</button>
-    </div>
+    // Fixed Z positions
+    const PLAYER_Z = WEB_DEPTH / 2;
+    const ENEMY_START_Z = -WEB_DEPTH / 2 + 1;
+    const ENEMY_END_Z = WEB_DEPTH / 2 - 2;
 
-    <!-- Include Three.js library -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    // Game mechanics
+    const PROJECTILE_SPEED = 0.6;
+    const COLLISION_Z_TOLERANCE = 1.0;
+    const POWER_UP_CHANCE = 0.15; // 15% chance of power-up spawn per enemy kill
+    const POWER_UP_DURATION = 10000; // 10 seconds
+    const SPECIAL_ENEMY_CHANCE = 0.1; // 10% chance of special enemy
 
-    <script>
-        // --- Global Variables ---
-        let scene, camera, renderer;
-        let webMesh;
-        let player;
-        const projectiles = [];
-        const enemies = [];
-        const powerUps = [];
-        const explosions = [];
-        const keyState = {};
+    // Configurable Settings
+    let playerLaneChangeRate = 6;
+    let currentEnemySpeed = 0.05;
+    let currentEnemySpawnInterval = 50;
+    let enemiesPerLevel = 20;
 
-        // Game State
-        let gameState = 'menu'; // 'menu', 'playing', 'paused', 'gameover', 'levelcomplete'
-        let isPaused = false;
+    // Game stats
+    let score = 0;
+    let lives = 3;
+    let level = 1;
+    let enemiesKilled = 0;
+    let enemiesRequired = enemiesPerLevel;
+    let enemySpawnTimer = 0;
+    let playerCurrentLaneIndex = Math.floor(NUM_LANES / 2);
+    let lastLaneChangeFrame = 0;
+    let activePowerUp = null;
+    let powerUpTimer = 0;
+    let lastFrameTime = 0;
 
-        // Web Configuration
-        let NUM_LANES = 16;
-        const WEB_DEPTH = 30;
-        const WEB_RADIUS = 10;
-        let LANE_ANGLE_STEP = (Math.PI * 2) / NUM_LANES;
-        let webType = 'circle';
+    // Sound effects (placeholders)
+    const sounds = {
+        fire: new Audio(),
+        explode: new Audio(),
+        powerUp: new Audio(),
+        levelComplete: new Audio()
+    };
 
-        // Fixed Z positions
-        const PLAYER_Z = WEB_DEPTH / 2;
-        const ENEMY_START_Z = -WEB_DEPTH / 2 + 1;
-        const ENEMY_END_Z = WEB_DEPTH / 2 - 2;
+    // --- UI Elements ---
+    const uiElement = document.getElementById('ui');
+    const scoreUI = document.getElementById('score');
+    const livesUI = document.getElementById('lives');
+    const powerUpUI = document.getElementById('active-power');
+    const levelUI = document.getElementById('current-level');
+    const pauseScreen = document.getElementById('pause-screen');
+    const gameOverScreen = document.getElementById('game-over');
+    const finalScoreUI = document.getElementById('final-score');
+    const restartButton = document.getElementById('restart-button');
+    const levelCompleteScreen = document.getElementById('level-complete');
+    const levelScoreUI = document.getElementById('level-score');
+    const nextLevelButton = document.getElementById('next-level-button');
+    const menuElement = document.getElementById('menu');
+    const speedSelect = document.getElementById('speed-select');
+    const difficultySelect = document.getElementById('difficulty-select');
+    const webTypeSelect = document.getElementById('web-type-select');
+    const startButton = document.getElementById('start-button');
 
-        // Game mechanics
-        const PROJECTILE_SPEED = 0.6;
-        const COLLISION_Z_TOLERANCE = 1.0;
-        const POWER_UP_CHANCE = 0.15; // 15% chance of power-up spawn per enemy kill
-        const POWER_UP_DURATION = 10000; // 10 seconds
-        const SPECIAL_ENEMY_CHANCE = 0.1; // 10% chance of special enemy
+    // --- Initialization Function ---
+    function init() {
+        // Scene setup
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x000000);
 
-        // Configurable Settings
-        let playerLaneChangeRate = 6;
-        let currentEnemySpeed = 0.05;
-        let currentEnemySpawnInterval = 50;
-        let enemiesPerLevel = 20;
+        // Camera setup
+        camera = new THREE.PerspectiveCamera(
+          90,
+          window.innerWidth / window.innerHeight,
+          0.1,
+          1000
+        );
+        camera.position.set(0, 13.6, WEB_DEPTH / 2 + 15);
+        camera.lookAt(0, 0, 0);
 
-        // Game stats
-        let score = 0;
-        let lives = 3;
-        let level = 1;
-        let enemiesKilled = 0;
-        let enemiesRequired = enemiesPerLevel;
-        let enemySpawnTimer = 0;
-        let playerCurrentLaneIndex = Math.floor(NUM_LANES / 2);
-        let lastLaneChangeFrame = 0;
-        let activePowerUp = null;
-        let powerUpTimer = 0;
-        let lastFrameTime = 0;
+        // Renderer setup
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
 
-        // Sound effects (placeholders)
-        const sounds = {
-            fire: new Audio(),
-            explode: new Audio(),
-            powerUp: new Audio(),
-            levelComplete: new Audio()
+        // Add lighting to enhance 3D effects
+        addLighting();
+
+        // Create the initial web - it will be recreated with startGame
+        createWeb(webType);
+
+        // Create player
+        createPlayer();
+        player.visible = false;
+
+        // Initial state: show menu, hide game UI/game over
+        uiElement.style.display = 'none';
+        document.getElementById('power-ups').style.display = 'none';
+        document.getElementById('level-indicator').style.display = 'none';
+        gameOverScreen.style.display = 'none';
+        levelCompleteScreen.style.display = 'none';
+        menuElement.style.display = 'block';
+        document.getElementById('instructions').style.display = 'block';
+
+        // Event Listeners
+        window.addEventListener('resize', onWindowResize);
+        window.addEventListener('keydown', onKeyDown);
+        window.addEventListener('keyup', onKeyUp);
+
+        // Button listeners
+        startButton.addEventListener('click', startGame);
+        restartButton.addEventListener('click', restartGame);
+        nextLevelButton.addEventListener('click', nextLevel);
+
+        // Start the animation loop
+        lastFrameTime = performance.now();
+        animate();
+    }
+
+    // --- Add scene lighting ---
+    function addLighting() {
+        // Add ambient light for base illumination
+        const ambientLight = new THREE.AmbientLight(0x202020);
+        scene.add(ambientLight);
+
+        // Add directional light for shadows and depth
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+        directionalLight.position.set(0, 20, 10);
+        scene.add(directionalLight);
+
+        // Add point light at camera position for dynamic lighting
+        const pointLight = new THREE.PointLight(0x0088ff, 0.8, 50);
+        pointLight.position.copy(camera.position);
+        scene.add(pointLight);
+    }
+
+    // --- Create Web Geometry based on selected type ---
+    function createWeb(type) {
+        // Remove existing web if any
+        if (webMesh) {
+            scene.remove(webMesh);
+        }
+
+        let shape;
+        webType = type;
+
+        switch (type) {
+            case 'square':
+                shape = createSquareWeb();
+                NUM_LANES = 4; // 4 sides
+                break;
+            case 'triangle':
+                shape = createTriangleWeb();
+                NUM_LANES = 3; // 3 sides
+                break;
+            case 'pentagon':
+                NUM_LANES = 5; // 5 sides
+                shape = createPolygonWeb(NUM_LANES);
+                break;
+            case 'hexagon':
+                NUM_LANES = 6; // 6 sides
+                shape = createPolygonWeb(NUM_LANES);
+                break;
+            case 'octagon':
+                NUM_LANES = 8; // 8 sides
+                shape = createPolygonWeb(NUM_LANES);
+                break;
+            case 'random':
+                // Create a random polygon between 5 and 8 sides
+                NUM_LANES = Math.floor(Math.random() * 4) + 5; // 5 to 8 sides
+                shape = createPolygonWeb(NUM_LANES);
+                break;
+            case 'circle':
+            default:
+                // Circle-like polygon with 16 sides
+                NUM_LANES = 16;
+                shape = createPolygonWeb(NUM_LANES);
+                break;
+        }
+
+        // Update LANE_ANGLE_STEP based on NUM_LANES
+        LANE_ANGLE_STEP = (Math.PI * 2) / NUM_LANES;
+
+        const extrudeSettings = {
+            steps: 1,
+            depth: WEB_DEPTH,
+            bevelEnabled: false
         };
 
-        // --- UI Elements ---
-        const uiElement = document.getElementById('ui');
-        const scoreUI = document.getElementById('score');
-        const livesUI = document.getElementById('lives');
-        const powerUpUI = document.getElementById('active-power');
-        const levelUI = document.getElementById('current-level');
-        const pauseScreen = document.getElementById('pause-screen');
-        const gameOverScreen = document.getElementById('game-over');
-        const finalScoreUI = document.getElementById('final-score');
-        const restartButton = document.getElementById('restart-button');
-        const levelCompleteScreen = document.getElementById('level-complete');
-        const levelScoreUI = document.getElementById('level-score');
-        const nextLevelButton = document.getElementById('next-level-button');
-        const menuElement = document.getElementById('menu');
-        const speedSelect = document.getElementById('speed-select');
-        const difficultySelect = document.getElementById('difficulty-select');
-        const webTypeSelect = document.getElementById('web-type-select');
-        const startButton = document.getElementById('start-button');
+        const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+        geometry.translate(0, 0, -WEB_DEPTH / 2);
 
-        // --- Initialization Function ---
-        function init() {
-            // Scene setup
-            scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x000000);
+        // Create enhanced wireframe with glow effect
+        const edges = new THREE.EdgesGeometry(geometry);
+        const material = new THREE.LineBasicMaterial({
+            color: 0x00ffff,
+            linewidth: 2,
+            transparent: true,
+            opacity: 0.8
+        });
+        webMesh = new THREE.LineSegments(edges, material);
 
-            // Camera setup
-            camera = new THREE.PerspectiveCamera(
-                90,
-                window.innerWidth / window.innerHeight,
-                0.1,
-                1000
-            );
-            camera.position.set(0, 15, WEB_DEPTH / 2 + 15);
-            camera.lookAt(0, 0, 0);
+        // Add some random variation to make the web more interesting
+        webMesh.rotation.x = 0;
+        webMesh.rotation.y = Math.random() * 0.2 - 0.1;
 
-            // Renderer setup
-            renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            document.body.appendChild(renderer.domElement);
+        scene.add(webMesh);
+    }
 
-            // Add lighting to enhance 3D effects
-            addLighting();
+    // Helper functions to create different web shapes
+    function createPolygonWeb(sides) {
+        const shape = new THREE.Shape();
+        shape.moveTo(WEB_RADIUS, 0);
+        for (let i = 1; i <= sides; i++) {
+            const angle = (i / sides) * Math.PI * 2;
+            shape.lineTo(WEB_RADIUS * Math.cos(angle), WEB_RADIUS * Math.sin(angle));
+        }
+        return shape;
+    }
 
-            // Create the initial web - it will be recreated with startGame
-            createWeb(webType);
+    function createSquareWeb() {
+        const shape = new THREE.Shape();
+        const size = WEB_RADIUS * 1.5;
+        shape.moveTo(size, size);
+        shape.lineTo(-size, size);
+        shape.lineTo(-size, -size);
+        shape.lineTo(size, -size);
+        shape.lineTo(size, size);
+        return shape;
+    }
 
-            // Create player
-            createPlayer();
-            player.visible = false;
+    function createTriangleWeb() {
+        const shape = new THREE.Shape();
+        const size = WEB_RADIUS * 1.8;
+        shape.moveTo(0, size);
+        shape.lineTo(-size, -size/2);
+        shape.lineTo(size, -size/2);
+        shape.lineTo(0, size);
+        return shape;
+    }
 
-            // Initial state: show menu, hide game UI/game over
-            uiElement.style.display = 'none';
-            document.getElementById('power-ups').style.display = 'none';
-            document.getElementById('level-indicator').style.display = 'none';
-            gameOverScreen.style.display = 'none';
-            levelCompleteScreen.style.display = 'none';
-            menuElement.style.display = 'block';
-            document.getElementById('instructions').style.display = 'block';
-
-            // Event Listeners
-            window.addEventListener('resize', onWindowResize);
-            window.addEventListener('keydown', onKeyDown);
-            window.addEventListener('keyup', onKeyUp);
-
-            // Button listeners
-            startButton.addEventListener('click', startGame);
-            restartButton.addEventListener('click', restartGame);
-            nextLevelButton.addEventListener('click', nextLevel);
-
-            // Start the animation loop
-            lastFrameTime = performance.now();
-            animate();
+    // --- Create Player with enhanced visuals ---
+    function createPlayer() {
+        // Remove existing player if any
+        if (player) {
+            scene.remove(player);
         }
 
-        // --- Add scene lighting ---
-        function addLighting() {
-            // Add ambient light for base illumination
-            const ambientLight = new THREE.AmbientLight(0x202020);
-            scene.add(ambientLight);
+        // Create a group to hold player elements
+        player = new THREE.Group();
 
-            // Add directional light for shadows and depth
-            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
-            directionalLight.position.set(0, 20, 10);
-            scene.add(directionalLight);
+        // Main body (box)
+        const bodyGeometry = new THREE.BoxGeometry(1.2, 1.2, 1.2);
+        const bodyMaterial = new THREE.MeshPhongMaterial({
+            color: 0xff0000,
+            emissive: 0x440000,
+            shininess: 30,
+            transparent: true,
+            opacity: 0.9
+        });
+        const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+        player.add(body);
 
-            // Add point light at camera position for dynamic lighting
-            const pointLight = new THREE.PointLight(0x0088ff, 0.8, 50);
-            pointLight.position.copy(camera.position);
-            scene.add(pointLight);
-        }
+        // Add wings to make it look more like a spaceship
+        const wingGeometry = new THREE.ConeGeometry(0.4, 1, 4);
+        const wingMaterial = new THREE.MeshPhongMaterial({
+            color: 0xffaa00,
+            emissive: 0x441100,
+            shininess: 20
+        });
 
-        // --- Create Web Geometry based on selected type ---
-        function createWeb(type) {
-            // Remove existing web if any
-            if (webMesh) {
-                scene.remove(webMesh);
+        const leftWing = new THREE.Mesh(wingGeometry, wingMaterial);
+        leftWing.position.set(-0.8, 0, 0);
+        leftWing.rotation.z = Math.PI / 2;
+        player.add(leftWing);
+
+        const rightWing = new THREE.Mesh(wingGeometry, wingMaterial);
+        rightWing.position.set(0.8, 0, 0);
+        rightWing.rotation.z = -Math.PI / 2;
+        player.add(rightWing);
+
+        // Add thruster effect (simple cone)
+        const thrusterGeometry = new THREE.ConeGeometry(0.3, 0.6, 8);
+        const thrusterMaterial = new THREE.MeshPhongMaterial({
+            color: 0x00ffff,
+            emissive: 0x00aaff,
+            emissiveIntensity: 0.5,
+            transparent: true,
+            opacity: 0.8
+        });
+        const thruster = new THREE.Mesh(thrusterGeometry, thrusterMaterial);
+        thruster.position.set(0, 0, 0.9);
+        thruster.rotation.x = Math.PI;
+        player.add(thruster);
+
+        scene.add(player);
+    }
+
+    // --- Update Player Position ---
+    function updatePlayerPosition() {
+        // Calculate position based on current lane and web type
+        let x, y;
+
+        if (webType === 'square') {
+            // For square web, place player at the midpoint of each side
+            switch (playerCurrentLaneIndex) {
+                case 0: // Top
+                    x = 0;
+                    y = WEB_RADIUS * 1.5;
+                    break;
+                case 1: // Left
+                    x = -WEB_RADIUS * 1.5;
+                    y = 0;
+                    break;
+                case 2: // Bottom
+                    x = 0;
+                    y = -WEB_RADIUS * 1.5;
+                    break;
+                case 3: // Right
+                    x = WEB_RADIUS * 1.5;
+                    y = 0;
+                    break;
             }
-
-            let shape;
-            webType = type;
-
-            switch (type) {
-                case 'square':
-                    shape = createSquareWeb();
-                    NUM_LANES = 4; // 4 sides
-                    break;
-                case 'triangle':
-                    shape = createTriangleWeb();
-                    NUM_LANES = 3; // 3 sides
-                    break;
-                case 'random':
-                    // Create a random polygon between 5 and 8 sides
-                    NUM_LANES = Math.floor(Math.random() * 4) + 5; // 5 to 8 sides
-                    shape = createPolygonWeb(NUM_LANES);
-                    break;
-                case 'circle':
-                default:
-                    // Circle-like polygon with 16 sides
-                    NUM_LANES = 16;
-                    shape = createPolygonWeb(NUM_LANES);
-                    break;
-            }
-
-            // Update LANE_ANGLE_STEP based on NUM_LANES
-            LANE_ANGLE_STEP = (Math.PI * 2) / NUM_LANES;
-
-            const extrudeSettings = {
-                steps: 1,
-                depth: WEB_DEPTH,
-                bevelEnabled: false
-            };
-
-            const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
-            geometry.translate(0, 0, -WEB_DEPTH / 2);
-
-            // Create enhanced wireframe with glow effect
-            const edges = new THREE.EdgesGeometry(geometry);
-            const material = new THREE.LineBasicMaterial({ 
-                color: 0x00ffff, 
-                linewidth: 2,
-                transparent: true,
-                opacity: 0.8
-            });
-            webMesh = new THREE.LineSegments(edges, material);
-
-            // Add some random variation to make the web more interesting
-            webMesh.rotation.x = 0;
-            webMesh.rotation.y = Math.random() * 0.2 - 0.1;
-
-            scene.add(webMesh);
+            // Rotation to face inward
+            const angle = (playerCurrentLaneIndex * Math.PI / 2) + Math.PI / 2;
+            player.rotation.z = angle;
         }
-
-        // Helper functions to create different web shapes
-        function createPolygonWeb(sides) {
-            const shape = new THREE.Shape();
-            shape.moveTo(WEB_RADIUS, 0);
-            for (let i = 1; i <= sides; i++) {
-                const angle = (i / sides) * Math.PI * 2;
-                shape.lineTo(WEB_RADIUS * Math.cos(angle), WEB_RADIUS * Math.sin(angle));
-            }
-            return shape;
-        }
-
-        function createSquareWeb() {
-            const shape = new THREE.Shape();
-            const size = WEB_RADIUS * 1.5;
-            shape.moveTo(size, size);
-            shape.lineTo(-size, size);
-            shape.lineTo(-size, -size);
-            shape.lineTo(size, -size);
-            shape.lineTo(size, size);
-            return shape;
-        }
-
-        function createTriangleWeb() {
-            const shape = new THREE.Shape();
+        else if (webType === 'triangle') {
+            // For triangle web, position at the three corners
+            const angle = (playerCurrentLaneIndex * Math.PI * 2 / 3);
             const size = WEB_RADIUS * 1.8;
-            shape.moveTo(0, size);
-            shape.lineTo(-size, -size/2);
-            shape.lineTo(size, -size/2);
-            shape.lineTo(0, size);
-            return shape;
+            if (playerCurrentLaneIndex === 0) {
+                x = 0;
+                y = size;
+            } else if (playerCurrentLaneIndex === 1) {
+                x = -size;
+                y = -size/2;
+            } else {
+                x = size;
+                y = -size/2;
+            }
+            player.rotation.z = angle + Math.PI / 2;
+        }
+        else {
+            // For circle or random polygon
+            const angle = playerCurrentLaneIndex * LANE_ANGLE_STEP;
+            x = WEB_RADIUS * Math.cos(angle);
+            y = WEB_RADIUS * Math.sin(angle);
+            player.rotation.z = angle + Math.PI / 2;
         }
 
-        // --- Create Player with enhanced visuals ---
-        function createPlayer() {
-            // Remove existing player if any
-            if (player) {
-                scene.remove(player);
+        player.position.set(x, y, PLAYER_Z);
+        player.rotation.x = 0;
+    }
+
+    // --- Set Game Settings ---
+    function setGameSettings(speed, difficulty, web) {
+        // Player Speed
+        switch(speed) {
+            case 'slow': playerLaneChangeRate = 10; break;
+            case 'normal': playerLaneChangeRate = 6; break;
+            case 'fast': playerLaneChangeRate = 3; break;
+            default: playerLaneChangeRate = 6;
+        }
+
+        // Difficulty
+        switch(difficulty) {
+            case 'easy':
+                currentEnemySpeed = 0.03;
+                currentEnemySpawnInterval = 80;
+                enemiesPerLevel = 15;
+                break;
+            case 'medium':
+                currentEnemySpeed = 0.05;
+                currentEnemySpawnInterval = 50;
+                enemiesPerLevel = 20;
+                break;
+            case 'hard':
+                currentEnemySpeed = 0.07;
+                currentEnemySpawnInterval = 30;
+                enemiesPerLevel = 25;
+                break;
+            default:
+                currentEnemySpeed = 0.05;
+                currentEnemySpawnInterval = 50;
+                enemiesPerLevel = 20;
+        }
+
+        // Web Type
+        webType = web;
+    }
+
+    // --- Start Game Function ---
+    function startGame() {
+        if (gameState === 'playing') return;
+
+        // Get selected settings
+        const selectedSpeed = speedSelect.value;
+        const selectedDifficulty = difficultySelect.value;
+        const selectedWebType = webTypeSelect.value;
+
+        setGameSettings(selectedSpeed, selectedDifficulty, selectedWebType);
+
+        // Create the web based on selected type
+        createWeb(selectedWebType);
+
+        // Reset game state
+        score = 0;
+        lives = 3;
+        level = 1;
+        enemiesKilled = 0;
+        enemiesRequired = enemiesPerLevel;
+        enemySpawnTimer = 0;
+        playerCurrentLaneIndex = Math.floor(NUM_LANES / 2);
+        lastLaneChangeFrame = 0;
+        activePowerUp = null;
+        powerUpTimer = 0;
+
+        // Clear existing game objects
+        clearGameObjects();
+
+        // Update player
+        updatePlayerPosition();
+
+        // Update UI
+        updateScoreUI();
+        updateLivesUI();
+        updateLevelUI();
+        updatePowerUpUI();
+
+        uiElement.style.display = 'block';
+        document.getElementById('power-ups').style.display = 'block';
+        document.getElementById('level-indicator').style.display = 'block';
+        gameOverScreen.style.display = 'none';
+        levelCompleteScreen.style.display = 'none';
+        menuElement.style.display = 'none';
+
+        gameState = 'playing';
+        isPaused = false;
+        player.visible = true;
+    }
+
+    // --- Reset for Next Level ---
+    function nextLevel() {
+        if (gameState !== 'levelcomplete') return;
+
+        // Increase level
+        level++;
+
+        // Increase difficulty
+        currentEnemySpeed += 0.01;
+        currentEnemySpawnInterval = Math.max(currentEnemySpawnInterval - 5, 20);
+        enemiesRequired = Math.min(enemiesPerLevel + (level * 5), 50);
+
+        // Reset level-specific variables
+        enemiesKilled = 0;
+        enemySpawnTimer = 0;
+
+        // Choose a new random web shape for variety
+        const webTypes = ['circle', 'square', 'triangle', 'pentagon', 'hexagon', 'octagon', 'random'];
+        const newWebType = webTypes[Math.floor(Math.random() * webTypes.length)];
+        createWeb(newWebType);
+
+        // Reset player position after new web creation
+        playerCurrentLaneIndex = Math.floor(NUM_LANES / 2);
+        updatePlayerPosition();
+
+        // Clear objects from previous level
+        clearGameObjects();
+
+        // Update UI
+        updateLevelUI();
+
+        // Hide level complete screen
+        levelCompleteScreen.style.display = 'none';
+
+        // Resume game
+        gameState = 'playing';
+        player.visible = true;
+    }
+
+    // --- Restart Game Function ---
+    function restartGame() {
+        gameState = 'menu';
+        gameOverScreen.style.display = 'none';
+        menuElement.style.display = 'block';
+        uiElement.style.display = 'none';
+        document.getElementById('power-ups').style.display = 'none';
+        document.getElementById('level-indicator').style.display = 'none';
+
+        player.visible = false;
+        clearGameObjects();
+    }
+
+    // --- Clear all game objects ---
+    function clearGameObjects() {
+        // Remove all enemies
+        enemies.forEach(enemy => scene.remove(enemy));
+        enemies.length = 0;
+
+        // Remove all projectiles
+        projectiles.forEach(p => scene.remove(p));
+        projectiles.length = 0;
+
+        // Remove all power-ups
+        powerUps.forEach(p => scene.remove(p));
+        powerUps.length = 0;
+
+        // Remove all explosions
+        explosions.forEach(e => scene.remove(e));
+        explosions.length = 0;
+    }
+
+    // --- Create Standard Projectile ---
+    function createProjectile(isSuperProjectile = false) {
+        if (gameState !== 'playing' || isPaused) return;
+
+        // Limit standard projectiles (unless super power active)
+        if (!isSuperProjectile && !activePowerUp && projectiles.length > 5) return;
+
+        const projectileGeometry = new THREE.BoxGeometry(0.3, 0.3, 2);
+
+        // Different appearance for super projectiles
+        const projectileMaterial = isSuperProjectile ?
+          new THREE.MeshPhongMaterial({
+              color: 0xff00ff,
+              emissive: 0x880088,
+              emissiveIntensity: 0.5,
+              transparent: true,
+              opacity: 0.8
+          }) :
+          new THREE.MeshPhongMaterial({
+              color: 0xffff00,
+              emissive: 0x888800,
+              emissiveIntensity: 0.3
+          });
+
+        const projectile = new THREE.Mesh(projectileGeometry, projectileMaterial);
+
+        // Position at player
+        projectile.position.copy(player.position);
+        projectile.position.z -= 1.5;
+
+        // Store projectile properties
+        projectile.laneIndex = playerCurrentLaneIndex;
+        projectile.isSuper = isSuperProjectile;
+
+        scene.add(projectile);
+        projectiles.push(projectile);
+
+        // Play sound
+        // sounds.fire.play();
+    }
+
+    // --- Create Enemy ---
+    function createEnemy(isSpecial = false) {
+        if (gameState !== 'playing' || isPaused) return;
+
+        // Geometry based on enemy type
+        const enemyGeometry = isSpecial ?
+          new THREE.OctahedronGeometry(1.2) :
+          new THREE.TetrahedronGeometry(1);
+
+        // Material based on enemy type
+        const enemyMaterial = isSpecial ?
+          new THREE.MeshPhongMaterial({
+              color: 0xff0000,
+              emissive: 0x880000,
+              emissiveIntensity: 0.5,
+              shininess: 30
+          }) :
+          new THREE.MeshPhongMaterial({
+              color: 0x00ff00,
+              emissive: 0x008800,
+              emissiveIntensity: 0.3,
+              shininess: 20
+          });
+
+        const enemy = new THREE.Mesh(enemyGeometry, enemyMaterial);
+
+        // Random lane
+        const laneIndex = Math.floor(Math.random() * NUM_LANES);
+
+        // Position depends on web type
+        let x, y;
+
+        if (webType === 'square') {
+            switch (laneIndex) {
+                case 0: // Top
+                    x = 0;
+                    y = WEB_RADIUS * 1.5;
+                    break;
+                case 1: // Left
+                    x = -WEB_RADIUS * 1.5;
+                    y = 0;
+                    break;
+                case 2: // Bottom
+                    x = 0;
+                    y = -WEB_RADIUS * 1.5;
+                    break;
+                case 3: // Right
+                    x = WEB_RADIUS * 1.5;
+                    y = 0;
+                    break;
             }
+        }
+        else if (webType === 'triangle') {
+            const size = WEB_RADIUS * 1.8;
+            if (laneIndex === 0) {
+                x = 0;
+                y = size;
+            } else if (laneIndex === 1) {
+                x = -size;
+                y = -size/2;
+            } else {
+                x = size;
+                y = -size/2;
+            }
+        }
+        else {
+            const angle = laneIndex * LANE_ANGLE_STEP;
+            x = WEB_RADIUS * Math.cos(angle);
+            y = WEB_RADIUS * Math.sin(angle);
+        }
 
-            // Create a group to hold player elements
-            player = new THREE.Group();
+        enemy.position.set(x, y, ENEMY_START_Z);
 
-            // Main body (box)
-            const bodyGeometry = new THREE.BoxGeometry(1.2, 1.2, 1.2);
-            const bodyMaterial = new THREE.MeshPhongMaterial({ 
-                color: 0xff0000,
-                emissive: 0x440000,
-                shininess: 30,
+        // Rotate enemy to face roughly towards the center
+        if (webType === 'square' || webType === 'triangle') {
+            const angle = (laneIndex * (Math.PI * 2) / NUM_LANES);
+            enemy.rotation.z = angle;
+        } else {
+            const angle = laneIndex * LANE_ANGLE_STEP;
+            enemy.rotation.z = angle;
+        }
+
+        // Add pulsating animation
+        enemy.initialScale = isSpecial ? 1.2 : 1.0;
+        enemy.pulsePhase = Math.random() * Math.PI * 2; // Random starting phase
+
+        // Store enemy properties
+        enemy.laneIndex = laneIndex;
+        enemy.isSpecial = isSpecial;
+        enemy.points = isSpecial ? 200 : 100;
+
+        scene.add(enemy);
+        enemies.push(enemy);
+    }
+
+    // --- Create Power-Up ---
+    function createPowerUp(position) {
+        const powerTypes = ['rapidFire', 'extraLife', 'shield', 'superProjectile'];
+        const powerType = powerTypes[Math.floor(Math.random() * powerTypes.length)];
+
+        // Create power-up object
+        const powerGeometry = new THREE.SphereGeometry(0.8, 8, 8);
+
+        // Color based on power-up type
+        let powerColor;
+        switch(powerType) {
+            case 'rapidFire': powerColor = 0xffaa00; break; // Orange
+            case 'extraLife': powerColor = 0xff0000; break; // Red
+            case 'shield': powerColor = 0x0088ff; break; // Blue
+            case 'superProjectile': powerColor = 0xff00ff; break; // Magenta
+            default: powerColor = 0xffffff; // White
+        }
+
+        const powerMaterial = new THREE.MeshPhongMaterial({
+            color: powerColor,
+            emissive: powerColor,
+            emissiveIntensity: 0.5,
+            transparent: true,
+            opacity: 0.9,
+            shininess: 50
+        });
+
+        const powerUp = new THREE.Mesh(powerGeometry, powerMaterial);
+
+        // Position at enemy death location (passed in as argument)
+        powerUp.position.copy(position);
+
+        // Store power-up properties
+        powerUp.powerType = powerType;
+        powerUp.rotationSpeed = 0.05;
+
+        scene.add(powerUp);
+        powerUps.push(powerUp);
+
+        return powerUp;
+    }
+
+    // --- Create Explosion Effect ---
+    function createExplosion(position, color) {
+        const particleCount = 15;
+        const explosionGroup = new THREE.Group();
+        explosionGroup.position.copy(position);
+
+        // Create particles
+        for (let i = 0; i < particleCount; i++) {
+            const particleGeometry = new THREE.SphereGeometry(0.2, 6, 6);
+            const particleMaterial = new THREE.MeshPhongMaterial({
+                color: color || 0xffaa00,
+                emissive: color || 0xffaa00,
+                emissiveIntensity: 0.5,
                 transparent: true,
                 opacity: 0.9
             });
-            const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
-            player.add(body);
 
-            // Add wings to make it look more like a spaceship
-            const wingGeometry = new THREE.ConeGeometry(0.4, 1, 4);
-            const wingMaterial = new THREE.MeshPhongMaterial({ 
-                color: 0xffaa00,
-                emissive: 0x441100,
-                shininess: 20
-            });
-            
-            const leftWing = new THREE.Mesh(wingGeometry, wingMaterial);
-            leftWing.position.set(-0.8, 0, 0);
-            leftWing.rotation.z = Math.PI / 2;
-            player.add(leftWing);
-            
-            const rightWing = new THREE.Mesh(wingGeometry, wingMaterial);
-            rightWing.position.set(0.8, 0, 0);
-            rightWing.rotation.z = -Math.PI / 2;
-            player.add(rightWing);
+            const particle = new THREE.Mesh(particleGeometry, particleMaterial);
 
-            // Add thruster effect (simple cone)
-            const thrusterGeometry = new THREE.ConeGeometry(0.3, 0.6, 8);
-            const thrusterMaterial = new THREE.MeshPhongMaterial({ 
-                color: 0x00ffff,
-                emissive: 0x00aaff,
-                emissiveIntensity: 0.5,
-                transparent: true,
-                opacity: 0.8
-            });
-            const thruster = new THREE.Mesh(thrusterGeometry, thrusterMaterial);
-            thruster.position.set(0, 0, 0.9);
-            thruster.rotation.x = Math.PI;
-            player.add(thruster);
+            // Random position within explosion radius
+            const theta = Math.random() * Math.PI * 2;
+            const phi = Math.random() * Math.PI;
+            const radius = Math.random() * 0.5;
 
-            scene.add(player);
+            particle.position.set(
+              radius * Math.sin(phi) * Math.cos(theta),
+              radius * Math.sin(phi) * Math.sin(theta),
+              radius * Math.cos(phi)
+            );
+
+            // Random velocity
+            particle.velocity = new THREE.Vector3(
+              (Math.random() - 0.5) * 0.2,
+              (Math.random() - 0.5) * 0.2,
+              (Math.random() - 0.5) * 0.2
+            );
+
+            // Lifespan in milliseconds
+            particle.life = 500;
+            particle.maxLife = 500;
+
+            explosionGroup.add(particle);
         }
 
-        // --- Update Player Position ---
-        function updatePlayerPosition() {
-            // Calculate position based on current lane and web type
-            let x, y;
-            
-            if (webType === 'square') {
-                // For square web, place player at the midpoint of each side
-                switch (playerCurrentLaneIndex) {
-                    case 0: // Top
-                        x = 0;
-                        y = WEB_RADIUS * 1.5;
-                        break;
-                    case 1: // Left
-                        x = -WEB_RADIUS * 1.5;
-                        y = 0;
-                        break;
-                    case 2: // Bottom
-                        x = 0;
-                        y = -WEB_RADIUS * 1.5;
-                        break;
-                    case 3: // Right
-                        x = WEB_RADIUS * 1.5;
-                        y = 0;
-                        break;
-                }
-                // Rotation to face inward
-                const angle = (playerCurrentLaneIndex * Math.PI / 2) + Math.PI / 2;
-                player.rotation.z = angle;
-            } 
-            else if (webType === 'triangle') {
-                // For triangle web, position at the three corners
-                const angle = (playerCurrentLaneIndex * Math.PI * 2 / 3);
-                const size = WEB_RADIUS * 1.8;
-                if (playerCurrentLaneIndex === 0) {
-                    x = 0;
-                    y = size;
-                } else if (playerCurrentLaneIndex === 1) {
-                    x = -size;
-                    y = -size/2;
-                } else {
-                    x = size;
-                    y = -size/2;
-                }
-                player.rotation.z = angle + Math.PI / 2;
-            }
-            else {
-                // For circle or random polygon
-                const angle = playerCurrentLaneIndex * LANE_ANGLE_STEP;
-                x = WEB_RADIUS * Math.cos(angle);
-                y = WEB_RADIUS * Math.sin(angle);
-                player.rotation.z = angle + Math.PI / 2;
-            }
-            
-            player.position.set(x, y, PLAYER_Z);
-            player.rotation.x = 0;
+        // Add to scene
+        scene.add(explosionGroup);
+        explosions.push(explosionGroup);
+
+        // Play explosion sound
+        // sounds.explode.play();
+
+        return explosionGroup;
+    }
+
+    // --- Apply Power-Up ---
+    function applyPowerUp(powerType) {
+        // Clear any existing power-up
+        if (activePowerUp) {
+            clearTimeout(powerUpTimer);
         }
 
-        // --- Set Game Settings ---
-        function setGameSettings(speed, difficulty, web) {
-            // Player Speed
-            switch(speed) {
-                case 'slow': playerLaneChangeRate = 10; break;
-                case 'normal': playerLaneChangeRate = 6; break;
-                case 'fast': playerLaneChangeRate = 3; break;
-                default: playerLaneChangeRate = 6;
-            }
+        activePowerUp = powerType;
+        updatePowerUpUI();
 
-            // Difficulty
-            switch(difficulty) {
-                case 'easy':
-                    currentEnemySpeed = 0.03;
-                    currentEnemySpawnInterval = 80;
-                    enemiesPerLevel = 15;
-                    break;
-                case 'medium':
-                    currentEnemySpeed = 0.05;
-                    currentEnemySpawnInterval = 50;
-                    enemiesPerLevel = 20;
-                    break;
-                case 'hard':
-                    currentEnemySpeed = 0.07;
-                    currentEnemySpawnInterval = 30;
-                    enemiesPerLevel = 25;
-                    break;
-                default:
-                    currentEnemySpeed = 0.05;
-                    currentEnemySpawnInterval = 50;
-                    enemiesPerLevel = 20;
-            }
-
-            // Web Type
-            webType = web;
+        // Apply power-up effect
+        switch(powerType) {
+            case 'rapidFire':
+                // Rapid fire handled in update loop
+                break;
+            case 'extraLife':
+                lives++;
+                updateLivesUI();
+                activePowerUp = null; // Immediate effect
+                break;
+            case 'shield':
+                // Shield is handled in collision detection
+                break;
+            case 'superProjectile':
+                // Super projectiles handled in projectile creation and collision
+                break;
         }
 
-        // --- Start Game Function ---
-        function startGame() {
-            if (gameState === 'playing') return;
+        // Set timeout to clear power-up after duration (except extraLife which is immediate)
+        if (powerType !== 'extraLife') {
+            powerUpTimer = setTimeout(() => {
+                activePowerUp = null;
+                updatePowerUpUI();
+            }, POWER_UP_DURATION);
+        }
 
-            // Get selected settings
-            const selectedSpeed = speedSelect.value;
-            const selectedDifficulty = difficultySelect.value;
-            const selectedWebType = webTypeSelect.value;
-            
-            setGameSettings(selectedSpeed, selectedDifficulty, selectedWebType);
+        // Play power-up sound
+        // sounds.powerUp.play();
+    }
 
-            // Create the web based on selected type
-            createWeb(selectedWebType);
+    // --- Update Game State (per frame) ---
+    function update(deltaTime) {
+        if (gameState !== 'playing' || isPaused) {
+            return;
+        }
 
-            // Reset game state
-            score = 0;
-            lives = 3;
-            level = 1;
-            enemiesKilled = 0;
-            enemiesRequired = enemiesPerLevel;
-            enemySpawnTimer = 0;
-            playerCurrentLaneIndex = Math.floor(NUM_LANES / 2);
-            lastLaneChangeFrame = 0;
-            activePowerUp = null;
-            powerUpTimer = 0;
+        const currentFrame = renderer.info.render.frame;
 
-            // Clear existing game objects
-            clearGameObjects();
+        // --- Animate Web ---
+        if (webMesh) {
+            webMesh.rotation.z += 0.0005; // Subtle rotation for visual effect
+        }
 
-            // Update player
+        // --- Player Movement ---
+        let laneChangeAttempt = false;
+        let newLaneIndex = playerCurrentLaneIndex;
+
+        if (keyState['ArrowLeft']) {
+            newLaneIndex = (playerCurrentLaneIndex + 1) % NUM_LANES;
+            laneChangeAttempt = true;
+        } else if (keyState['ArrowRight']) {
+            newLaneIndex = (playerCurrentLaneIndex - 1 + NUM_LANES) % NUM_LANES;
+            laneChangeAttempt = true;
+        }
+
+        if (laneChangeAttempt && currentFrame >= lastLaneChangeFrame + playerLaneChangeRate) {
+            playerCurrentLaneIndex = newLaneIndex;
             updatePlayerPosition();
-
-            // Update UI
-            updateScoreUI();
-            updateLivesUI();
-            updateLevelUI();
-            updatePowerUpUI();
-            
-            uiElement.style.display = 'block';
-            document.getElementById('power-ups').style.display = 'block';
-            document.getElementById('level-indicator').style.display = 'block';
-            gameOverScreen.style.display = 'none';
-            levelCompleteScreen.style.display = 'none';
-            menuElement.style.display = 'none';
-
-            gameState = 'playing';
-            isPaused = false;
-            player.visible = true;
+            lastLaneChangeFrame = currentFrame;
         }
 
-        // --- Reset for Next Level ---
-        function nextLevel() {
-            if (gameState !== 'levelcomplete') return;
+        // Handle automatic firing for rapid fire power-up
+        if (activePowerUp === 'rapidFire' && currentFrame % 5 === 0) {
+            createProjectile();
+        }
 
-            // Increase level
-            level++;
-            
-            // Increase difficulty
-            currentEnemySpeed += 0.01;
-            currentEnemySpawnInterval = Math.max(currentEnemySpawnInterval - 5, 20);
-            enemiesRequired = Math.min(enemiesPerLevel + (level * 5), 50);
-            
-            // Reset level-specific variables
-            enemiesKilled = 0;
+        // --- Update Projectiles ---
+        for (let i = projectiles.length - 1; i >= 0; i--) {
+            const projectile = projectiles[i];
+            projectile.position.z -= PROJECTILE_SPEED;
+
+            // Super projectiles have a trailing effect
+            if (projectile.isSuper && Math.random() > 0.5) {
+                const trailGeometry = new THREE.SphereGeometry(0.1, 4, 4);
+                const trailMaterial = new THREE.MeshBasicMaterial({
+                    color: 0xff00ff,
+                    transparent: true,
+                    opacity: 0.5
+                });
+                const trail = new THREE.Mesh(trailGeometry, trailMaterial);
+                trail.position.copy(projectile.position);
+                scene.add(trail);
+
+                // Fade out trail
+                setTimeout(() => {
+                    scene.remove(trail);
+                    trail.geometry.dispose();
+                    trail.material.dispose();
+                }, 500);
+            }
+
+            // Remove projectile if off screen
+            if (projectile.position.z < ENEMY_START_Z - 5) {
+                scene.remove(projectile);
+                projectiles.splice(i, 1);
+            }
+        }
+
+        // --- Update Enemies ---
+        enemySpawnTimer++;
+
+        // Spawn enemies until we've reached the level's required number
+        if (enemySpawnTimer >= currentEnemySpawnInterval && enemies.length < enemiesRequired - enemiesKilled) {
+            // Chance to spawn special enemy
+            const isSpecial = Math.random() < SPECIAL_ENEMY_CHANCE;
+            createEnemy(isSpecial);
             enemySpawnTimer = 0;
-            
-            // Choose a new random web shape for variety
-            const webTypes = ['circle', 'square', 'triangle', 'random'];
-            const newWebType = webTypes[Math.floor(Math.random() * webTypes.length)];
-            createWeb(newWebType);
-            
-            // Reset player position after new web creation
-            playerCurrentLaneIndex = Math.floor(NUM_LANES / 2);
-            updatePlayerPosition();
-            
-            // Clear objects from previous level
-            clearGameObjects();
-            
-            // Update UI
-            updateLevelUI();
-            
-            // Hide level complete screen
-            levelCompleteScreen.style.display = 'none';
-            
-            // Resume game
-            gameState = 'playing';
-            player.visible = true;
         }
 
-        // --- Restart Game Function ---
-        function restartGame() {
-            gameState = 'menu';
-            gameOverScreen.style.display = 'none';
-            menuElement.style.display = 'block';
-            uiElement.style.display = 'none';
-            document.getElementById('power-ups').style.display = 'none';
-            document.getElementById('level-indicator').style.display = 'none';
-            
-            player.visible = false;
-            clearGameObjects();
-        }
+        for (let i = enemies.length - 1; i >= 0; i--) {
+            const enemy = enemies[i];
 
-        // --- Clear all game objects ---
-        function clearGameObjects() {
-            // Remove all enemies
-            enemies.forEach(enemy => scene.remove(enemy));
-            enemies.length = 0;
-            
-            // Remove all projectiles
-            projectiles.forEach(p => scene.remove(p));
-            projectiles.length = 0;
-            
-            // Remove all power-ups
-            powerUps.forEach(p => scene.remove(p));
-            powerUps.length = 0;
-            
-            // Remove all explosions
-            explosions.forEach(e => scene.remove(e));
-            explosions.length = 0;
-        }
+            // Move enemy
+            enemy.position.z += currentEnemySpeed * (enemy.isSpecial ? 1.2 : 1.0);
 
-        // --- Create Standard Projectile ---
-        function createProjectile(isSuperProjectile = false) {
-            if (gameState !== 'playing' || isPaused) return;
+            // Pulsating animation
+            const pulseScale = enemy.initialScale + Math.sin(enemy.pulsePhase) * 0.1;
+            enemy.pulsePhase += 0.05;
+            enemy.scale.set(pulseScale, pulseScale, pulseScale);
 
-            // Limit standard projectiles (unless super power active)
-            if (!isSuperProjectile && !activePowerUp && projectiles.length > 5) return;
+            // Special enemies also rotate
+            if (enemy.isSpecial) {
+                enemy.rotation.y += 0.03;
+                enemy.rotation.x += 0.02;
+            }
 
-            const projectileGeometry = new THREE.BoxGeometry(0.3, 0.3, 2);
-            
-            // Different appearance for super projectiles
-            const projectileMaterial = isSuperProjectile ? 
-                new THREE.MeshPhongMaterial({ 
-                    color: 0xff00ff, 
-                    emissive: 0x880088,
-                    emissiveIntensity: 0.5,
-                    transparent: true,
-                    opacity: 0.8
-                }) : 
-                new THREE.MeshPhongMaterial({ 
-                    color: 0xffff00, 
-                    emissive: 0x888800,
-                    emissiveIntensity: 0.3
-                });
-            
-            const projectile = new THREE.Mesh(projectileGeometry, projectileMaterial);
-            
-            // Position at player
-            projectile.position.copy(player.position);
-            projectile.position.z -= 1.5;
-            
-            // Store projectile properties
-            projectile.laneIndex = playerCurrentLaneIndex;
-            projectile.isSuper = isSuperProjectile;
-            
-            scene.add(projectile);
-            projectiles.push(projectile);
-            
-            // Play sound
-            // sounds.fire.play();
-        }
-
-        // --- Create Enemy ---
-        function createEnemy(isSpecial = false) {
-            if (gameState !== 'playing' || isPaused) return;
-
-            // Geometry based on enemy type
-            const enemyGeometry = isSpecial ? 
-                new THREE.OctahedronGeometry(1.2) : 
-                new THREE.TetrahedronGeometry(1);
-            
-            // Material based on enemy type
-            const enemyMaterial = isSpecial ? 
-                new THREE.MeshPhongMaterial({ 
-                    color: 0xff0000, 
-                    emissive: 0x880000,
-                    emissiveIntensity: 0.5,
-                    shininess: 30
-                }) : 
-                new THREE.MeshPhongMaterial({ 
-                    color: 0x00ff00, 
-                    emissive: 0x008800,
-                    emissiveIntensity: 0.3,
-                    shininess: 20
-                });
-            
-            const enemy = new THREE.Mesh(enemyGeometry, enemyMaterial);
-            
-            // Random lane
-            const laneIndex = Math.floor(Math.random() * NUM_LANES);
-            
-            // Position depends on web type
-            let x, y;
-            
-            if (webType === 'square') {
-                switch (laneIndex) {
-                    case 0: // Top
-                        x = 0;
-                        y = WEB_RADIUS * 1.5;
-                        break;
-                    case 1: // Left
-                        x = -WEB_RADIUS * 1.5;
-                        y = 0;
-                        break;
-                    case 2: // Bottom
-                        x = 0;
-                        y = -WEB_RADIUS * 1.5;
-                        break;
-                    case 3: // Right
-                        x = WEB_RADIUS * 1.5;
-                        y = 0;
-                        break;
-                }
-            } 
-            else if (webType === 'triangle') {
-                const size = WEB_RADIUS * 1.8;
-                if (laneIndex === 0) {
-                    x = 0;
-                    y = size;
-                } else if (laneIndex === 1) {
-                    x = -size;
-                    y = -size/2;
+            // Check if enemy reached the player's end
+            if (enemy.position.z > ENEMY_END_Z) {
+                // Player loses a life if not shielded
+                if (activePowerUp !== 'shield') {
+                    loseLife();
                 } else {
-                    x = size;
-                    y = -size/2;
-                }
-            }
-            else {
-                const angle = laneIndex * LANE_ANGLE_STEP;
-                x = WEB_RADIUS * Math.cos(angle);
-                y = WEB_RADIUS * Math.sin(angle);
-            }
-            
-            enemy.position.set(x, y, ENEMY_START_Z);
-            
-            // Rotate enemy to face roughly towards the center
-            if (webType === 'square' || webType === 'triangle') {
-                const angle = (laneIndex * (Math.PI * 2) / NUM_LANES);
-                enemy.rotation.z = angle;
-            } else {
-                const angle = laneIndex * LANE_ANGLE_STEP;
-                enemy.rotation.z = angle;
-            }
-            
-            // Add pulsating animation
-            enemy.initialScale = isSpecial ? 1.2 : 1.0;
-            enemy.pulsePhase = Math.random() * Math.PI * 2; // Random starting phase
-            
-            // Store enemy properties
-            enemy.laneIndex = laneIndex;
-            enemy.isSpecial = isSpecial;
-            enemy.points = isSpecial ? 200 : 100;
-            
-            scene.add(enemy);
-            enemies.push(enemy);
-        }
-        
-        // --- Create Power-Up ---
-        function createPowerUp(position) {
-            const powerTypes = ['rapidFire', 'extraLife', 'shield', 'superProjectile'];
-            const powerType = powerTypes[Math.floor(Math.random() * powerTypes.length)];
-            
-            // Create power-up object
-            const powerGeometry = new THREE.SphereGeometry(0.8, 8, 8);
-            
-            // Color based on power-up type
-            let powerColor;
-            switch(powerType) {
-                case 'rapidFire': powerColor = 0xffaa00; break; // Orange
-                case 'extraLife': powerColor = 0xff0000; break; // Red
-                case 'shield': powerColor = 0x0088ff; break; // Blue
-                case 'superProjectile': powerColor = 0xff00ff; break; // Magenta
-                default: powerColor = 0xffffff; // White
-            }
-            
-            const powerMaterial = new THREE.MeshPhongMaterial({ 
-                color: powerColor,
-                emissive: powerColor,
-                emissiveIntensity: 0.5,
-                transparent: true,
-                opacity: 0.9,
-                shininess: 50
-            });
-            
-            const powerUp = new THREE.Mesh(powerGeometry, powerMaterial);
-            
-            // Position at enemy death location (passed in as argument)
-            powerUp.position.copy(position);
-            
-            // Store power-up properties
-            powerUp.powerType = powerType;
-            powerUp.rotationSpeed = 0.05;
-            
-            scene.add(powerUp);
-            powerUps.push(powerUp);
-            
-            return powerUp;
-        }
-        
-        // --- Create Explosion Effect ---
-        function createExplosion(position, color) {
-            const particleCount = 15;
-            const explosionGroup = new THREE.Group();
-            explosionGroup.position.copy(position);
-            
-            // Create particles
-            for (let i = 0; i < particleCount; i++) {
-                const particleGeometry = new THREE.SphereGeometry(0.2, 6, 6);
-                const particleMaterial = new THREE.MeshPhongMaterial({ 
-                    color: color || 0xffaa00,
-                    emissive: color || 0xffaa00,
-                    emissiveIntensity: 0.5,
-                    transparent: true,
-                    opacity: 0.9
-                });
-                
-                const particle = new THREE.Mesh(particleGeometry, particleMaterial);
-                
-                // Random position within explosion radius
-                const theta = Math.random() * Math.PI * 2;
-                const phi = Math.random() * Math.PI;
-                const radius = Math.random() * 0.5;
-                
-                particle.position.set(
-                    radius * Math.sin(phi) * Math.cos(theta),
-                    radius * Math.sin(phi) * Math.sin(theta),
-                    radius * Math.cos(phi)
-                );
-                
-                // Random velocity
-                particle.velocity = new THREE.Vector3(
-                    (Math.random() - 0.5) * 0.2,
-                    (Math.random() - 0.5) * 0.2,
-                    (Math.random() - 0.5) * 0.2
-                );
-                
-                // Lifespan in milliseconds
-                particle.life = 500;
-                particle.maxLife = 500;
-                
-                explosionGroup.add(particle);
-            }
-            
-            // Add to scene
-            scene.add(explosionGroup);
-            explosions.push(explosionGroup);
-            
-            // Play explosion sound
-            // sounds.explode.play();
-            
-            return explosionGroup;
-        }
-        
-        // --- Apply Power-Up ---
-        function applyPowerUp(powerType) {
-            // Clear any existing power-up
-            if (activePowerUp) {
-                clearTimeout(powerUpTimer);
-            }
-            
-            activePowerUp = powerType;
-            updatePowerUpUI();
-            
-            // Apply power-up effect
-            switch(powerType) {
-                case 'rapidFire':
-                    // Rapid fire handled in update loop
-                    break;
-                case 'extraLife':
-                    lives++;
-                    updateLivesUI();
-                    activePowerUp = null; // Immediate effect
-                    break;
-                case 'shield':
-                    // Shield is handled in collision detection
-                    break;
-                case 'superProjectile':
-                    // Super projectiles handled in projectile creation and collision
-                    break;
-            }
-            
-            // Set timeout to clear power-up after duration (except extraLife which is immediate)
-            if (powerType !== 'extraLife') {
-                powerUpTimer = setTimeout(() => {
+                    // Shield absorbs one hit
                     activePowerUp = null;
                     updatePowerUpUI();
-                }, POWER_UP_DURATION);
+                    clearTimeout(powerUpTimer);
+
+                    // Visual effect for shield hit
+                    createExplosion(enemy.position, 0x0088ff);
+                }
+
+                scene.remove(enemy);
+                enemies.splice(i, 1);
+
+                if (gameState !== 'playing') return;
             }
-            
-            // Play power-up sound
-            // sounds.powerUp.play();
         }
-        
-        // --- Update Game State (per frame) ---
-        function update(deltaTime) {
-            if (gameState !== 'playing' || isPaused) {
-                return;
+
+        // --- Update Power-Ups ---
+        for (let i = powerUps.length - 1; i >= 0; i--) {
+            const powerUp = powerUps[i];
+
+            // Move power-up towards player
+            powerUp.position.z += currentEnemySpeed * 0.5;
+
+            // Rotate power-up
+            powerUp.rotation.y += powerUp.rotationSpeed;
+            powerUp.rotation.x += powerUp.rotationSpeed * 0.7;
+
+            // Pulsate size
+            const pulseScale = 1 + 0.1 * Math.sin(performance.now() * 0.005);
+            powerUp.scale.set(pulseScale, pulseScale, pulseScale);
+
+            // Check if power-up is collected
+            if (powerUp.position.z > PLAYER_Z - 1 &&
+              Math.abs(powerUp.position.x - player.position.x) < 2 &&
+              Math.abs(powerUp.position.y - player.position.y) < 2) {
+
+                // Collect power-up
+                applyPowerUp(powerUp.powerType);
+
+                // Remove power-up
+                scene.remove(powerUp);
+                powerUps.splice(i, 1);
             }
-            
-            const currentFrame = renderer.info.render.frame;
-            
-            // --- Animate Web ---
-            if (webMesh) {
-                webMesh.rotation.z += 0.0005; // Subtle rotation for visual effect
+
+            // Remove if past player
+            if (powerUp.position.z > PLAYER_Z + 5) {
+                scene.remove(powerUp);
+                powerUps.splice(i, 1);
             }
-            
-            // --- Player Movement ---
-            let laneChangeAttempt = false;
-            let newLaneIndex = playerCurrentLaneIndex;
-            
-            if (keyState['ArrowLeft']) {
-                newLaneIndex = (playerCurrentLaneIndex + 1) % NUM_LANES;
-                laneChangeAttempt = true;
-            } else if (keyState['ArrowRight']) {
-                newLaneIndex = (playerCurrentLaneIndex - 1 + NUM_LANES) % NUM_LANES;
-                laneChangeAttempt = true;
-            }
-            
-            if (laneChangeAttempt && currentFrame >= lastLaneChangeFrame + playerLaneChangeRate) {
-                playerCurrentLaneIndex = newLaneIndex;
-                updatePlayerPosition();
-                lastLaneChangeFrame = currentFrame;
-            }
-            
-            // Handle automatic firing for rapid fire power-up
-            if (activePowerUp === 'rapidFire' && currentFrame % 5 === 0) {
-                createProjectile();
-            }
-            
-            // --- Update Projectiles ---
-            for (let i = projectiles.length - 1; i >= 0; i--) {
-                const projectile = projectiles[i];
-                projectile.position.z -= PROJECTILE_SPEED;
-                
-                // Super projectiles have a trailing effect
-                if (projectile.isSuper && Math.random() > 0.5) {
-                    const trailGeometry = new THREE.SphereGeometry(0.1, 4, 4);
-                    const trailMaterial = new THREE.MeshBasicMaterial({ 
-                        color: 0xff00ff,
-                        transparent: true,
-                        opacity: 0.5
-                    });
-                    const trail = new THREE.Mesh(trailGeometry, trailMaterial);
-                    trail.position.copy(projectile.position);
-                    scene.add(trail);
-                    
-                    // Fade out trail
-                    setTimeout(() => {
-                        scene.remove(trail);
-                        trail.geometry.dispose();
-                        trail.material.dispose();
-                    }, 500);
+        }
+
+        // --- Update Explosions ---
+        for (let i = explosions.length - 1; i >= 0; i--) {
+            const explosion = explosions[i];
+            let removeExplosion = true;
+
+            // Update each particle
+            explosion.children.forEach(particle => {
+                particle.position.add(particle.velocity);
+                particle.life -= deltaTime;
+
+                // Fade out particle
+                if (particle.life > 0) {
+                    particle.material.opacity = particle.life / particle.maxLife;
+                    removeExplosion = false;
+                } else {
+                    particle.material.opacity = 0;
                 }
-                
-                // Remove projectile if off screen
-                if (projectile.position.z < ENEMY_START_Z - 5) {
-                    scene.remove(projectile);
-                    projectiles.splice(i, 1);
-                }
-            }
-            
-            // --- Update Enemies ---
-            enemySpawnTimer++;
-            
-            // Spawn enemies until we've reached the level's required number
-            if (enemySpawnTimer >= currentEnemySpawnInterval && enemies.length < enemiesRequired - enemiesKilled) {
-                // Chance to spawn special enemy
-                const isSpecial = Math.random() < SPECIAL_ENEMY_CHANCE;
-                createEnemy(isSpecial);
-                enemySpawnTimer = 0;
-            }
-            
-            for (let i = enemies.length - 1; i >= 0; i--) {
-                const enemy = enemies[i];
-                
-                // Move enemy
-                enemy.position.z += currentEnemySpeed * (enemy.isSpecial ? 1.2 : 1.0);
-                
-                // Pulsating animation
-                const pulseScale = enemy.initialScale + Math.sin(enemy.pulsePhase) * 0.1;
-                enemy.pulsePhase += 0.05;
-                enemy.scale.set(pulseScale, pulseScale, pulseScale);
-                
-                // Special enemies also rotate
-                if (enemy.isSpecial) {
-                    enemy.rotation.y += 0.03;
-                    enemy.rotation.x += 0.02;
-                }
-                
-                // Check if enemy reached the player's end
-                if (enemy.position.z > ENEMY_END_Z) {
-                    // Player loses a life if not shielded
-                    if (activePowerUp !== 'shield') {
-                        loseLife();
-                    } else {
-                        // Shield absorbs one hit
-                        activePowerUp = null;
-                        updatePowerUpUI();
-                        clearTimeout(powerUpTimer);
-                        
-                        // Visual effect for shield hit
-                        createExplosion(enemy.position, 0x0088ff);
-                    }
-                    
-                    scene.remove(enemy);
-                    enemies.splice(i, 1);
-                    
-                    if (gameState !== 'playing') return;
-                }
-            }
-            
-            // --- Update Power-Ups ---
-            for (let i = powerUps.length - 1; i >= 0; i--) {
-                const powerUp = powerUps[i];
-                
-                // Move power-up towards player
-                powerUp.position.z += currentEnemySpeed * 0.5;
-                
-                // Rotate power-up
-                powerUp.rotation.y += powerUp.rotationSpeed;
-                powerUp.rotation.x += powerUp.rotationSpeed * 0.7;
-                
-                // Pulsate size
-                const pulseScale = 1 + 0.1 * Math.sin(performance.now() * 0.005);
-                powerUp.scale.set(pulseScale, pulseScale, pulseScale);
-                
-                // Check if power-up is collected
-                if (powerUp.position.z > PLAYER_Z - 1 && 
-                    Math.abs(powerUp.position.x - player.position.x) < 2 &&
-                    Math.abs(powerUp.position.y - player.position.y) < 2) {
-                    
-                    // Collect power-up
-                    applyPowerUp(powerUp.powerType);
-                    
-                    // Remove power-up
-                    scene.remove(powerUp);
-                    powerUps.splice(i, 1);
-                }
-                
-                // Remove if past player
-                if (powerUp.position.z > PLAYER_Z + 5) {
-                    scene.remove(powerUp);
-                    powerUps.splice(i, 1);
-                }
-            }
-            
-            // --- Update Explosions ---
-            for (let i = explosions.length - 1; i >= 0; i--) {
-                const explosion = explosions[i];
-                let removeExplosion = true;
-                
-                // Update each particle
+            });
+
+            // Remove explosion if all particles are dead
+            if (removeExplosion) {
+                // Clean up all particles
                 explosion.children.forEach(particle => {
-                    particle.position.add(particle.velocity);
-                    particle.life -= deltaTime;
-                    
-                    // Fade out particle
-                    if (particle.life > 0) {
-                        particle.material.opacity = particle.life / particle.maxLife;
-                        removeExplosion = false;
-                    } else {
-                        particle.material.opacity = 0;
-                    }
+                    particle.geometry.dispose();
+                    particle.material.dispose();
                 });
-                
-                // Remove explosion if all particles are dead
-                if (removeExplosion) {
-                    // Clean up all particles
-                    explosion.children.forEach(particle => {
-                        particle.geometry.dispose();
-                        particle.material.dispose();
-                    });
-                    scene.remove(explosion);
-                    explosions.splice(i, 1);
-                }
+                scene.remove(explosion);
+                explosions.splice(i, 1);
             }
-            
-            // --- Collision Detection (Projectile vs Enemy) ---
-            for (let i = projectiles.length - 1; i >= 0; i--) {
-                const projectile = projectiles[i];
-                let projectileHit = false;
-                
-                for (let j = enemies.length - 1; j >= 0; j--) {
-                    const enemy = enemies[j];
-                    
-                    // Check if in same lane and close enough on Z axis
-                    if (projectile.laneIndex === enemy.laneIndex &&
-                        Math.abs(projectile.position.z - enemy.position.z) < COLLISION_Z_TOLERANCE) {
-                        
-                        // Collision detected!
-                        const hitPoints = enemy.points;
-                        addScore(hitPoints);
-                        enemiesKilled++;
-                        
-                        // Create explosion effect
-                        createExplosion(enemy.position, enemy.isSpecial ? 0xff0000 : 0x00ff00);
-                        
-                        // Chance to spawn power-up
-                        if (Math.random() < POWER_UP_CHANCE || enemy.isSpecial) {
-                            createPowerUp(enemy.position);
-                        }
-                        
-                        // Remove enemy
-                        scene.remove(enemy);
-                        enemies.splice(j, 1);
-                        
-                        // Super projectiles can pass through enemies
-                        if (!projectile.isSuper) {
-                            // Remove projectile
-                            scene.remove(projectile);
-                            projectiles.splice(i, 1);
-                            projectileHit = true;
-                        }
-                        
-                        // Check if level is complete
-                        if (enemiesKilled >= enemiesRequired) {
-                            completedLevel();
-                        }
-                        
-                        // Break inner loop if projectile was destroyed
-                        if (projectileHit) break;
+        }
+
+        // --- Collision Detection (Projectile vs Enemy) ---
+        for (let i = projectiles.length - 1; i >= 0; i--) {
+            const projectile = projectiles[i];
+            let projectileHit = false;
+
+            for (let j = enemies.length - 1; j >= 0; j--) {
+                const enemy = enemies[j];
+
+                // Check if in same lane and close enough on Z axis
+                if (projectile.laneIndex === enemy.laneIndex &&
+                  Math.abs(projectile.position.z - enemy.position.z) < COLLISION_Z_TOLERANCE) {
+
+                    // Collision detected!
+                    const hitPoints = enemy.points;
+                    addScore(hitPoints);
+                    enemiesKilled++;
+
+                    // Create explosion effect
+                    createExplosion(enemy.position, enemy.isSpecial ? 0xff0000 : 0x00ff00);
+
+                    // Chance to spawn power-up
+                    if (Math.random() < POWER_UP_CHANCE || enemy.isSpecial) {
+                        createPowerUp(enemy.position);
                     }
+
+                    // Remove enemy
+                    scene.remove(enemy);
+                    enemies.splice(j, 1);
+
+                    // Super projectiles can pass through enemies
+                    if (!projectile.isSuper) {
+                        // Remove projectile
+                        scene.remove(projectile);
+                        projectiles.splice(i, 1);
+                        projectileHit = true;
+                    }
+
+                    // Check if level is complete
+                    if (enemiesKilled >= enemiesRequired) {
+                        completedLevel();
+                    }
+
+                    // Break inner loop if projectile was destroyed
+                    if (projectileHit) break;
                 }
             }
         }
-        
-        // --- Game Over Logic ---
-        function loseLife() {
-            if (gameState !== 'playing') return;
-            
-            lives--;
-            updateLivesUI();
-            
-            // Visual indication
-            createExplosion(player.position, 0xff0000);
-            
-            // Make player flash
-            let flashCount = 0;
-            const flashInterval = setInterval(() => {
-                player.visible = !player.visible;
-                flashCount++;
-                if (flashCount >= 6) {
-                    clearInterval(flashInterval);
-                    player.visible = true;
-                }
-            }, 200);
-            
-            if (lives <= 0) {
-                endGame();
+    }
+
+    // --- Game Over Logic ---
+    function loseLife() {
+        if (gameState !== 'playing') return;
+
+        lives--;
+        updateLivesUI();
+
+        // Visual indication
+        createExplosion(player.position, 0xff0000);
+
+        // Make player flash
+        let flashCount = 0;
+        const flashInterval = setInterval(() => {
+            player.visible = !player.visible;
+            flashCount++;
+            if (flashCount >= 6) {
+                clearInterval(flashInterval);
+                player.visible = true;
             }
+        }, 200);
+
+        if (lives <= 0) {
+            endGame();
         }
-        
-        function endGame() {
-            if (gameState !== 'playing') return;
-            
-            gameState = 'gameover';
-            finalScoreUI.textContent = 'FINAL SCORE: ' + score;
-            gameOverScreen.style.display = 'block';
-            uiElement.style.display = 'none';
-            document.getElementById('power-ups').style.display = 'none';
-            document.getElementById('level-indicator').style.display = 'none';
-            
-            // Clear game objects
-            clearGameObjects();
-            
-            // Hide player
-            player.visible = false;
-            
-            // Clear power-up timer
-            if (activePowerUp) {
-                clearTimeout(powerUpTimer);
-                activePowerUp = null;
-            }
+    }
+
+    function endGame() {
+        if (gameState !== 'playing') return;
+
+        gameState = 'gameover';
+        finalScoreUI.textContent = 'FINAL SCORE: ' + score;
+        gameOverScreen.style.display = 'block';
+        uiElement.style.display = 'none';
+        document.getElementById('power-ups').style.display = 'none';
+        document.getElementById('level-indicator').style.display = 'none';
+
+        // Clear game objects
+        clearGameObjects();
+
+        // Hide player
+        player.visible = false;
+
+        // Clear power-up timer
+        if (activePowerUp) {
+            clearTimeout(powerUpTimer);
+            activePowerUp = null;
         }
-        
-        // --- Level Complete Logic ---
-        function completedLevel() {
-            if (gameState !== 'playing') return;
-            
-            gameState = 'levelcomplete';
-            levelScoreUI.textContent = 'LEVEL ' + level + ' SCORE: ' + score;
-            levelCompleteScreen.style.display = 'block';
-            
-            // Bonus points for completing level
-            const levelBonus = level * 500;
-            addScore(levelBonus);
-            
-            // Play level complete sound
-            // sounds.levelComplete.play();
-            
-            // Clear power-up timer
-            if (activePowerUp) {
-                clearTimeout(powerUpTimer);
-                activePowerUp = null;
-            }
-            
-            // Hide player
-            player.visible = false;
+    }
+
+    // --- Level Complete Logic ---
+    function completedLevel() {
+        if (gameState !== 'playing') return;
+
+        gameState = 'levelcomplete';
+        levelScoreUI.textContent = 'LEVEL ' + level + ' SCORE: ' + score;
+        levelCompleteScreen.style.display = 'block';
+
+        // Bonus points for completing level
+        const levelBonus = level * 500;
+        addScore(levelBonus);
+
+        // Play level complete sound
+        // sounds.levelComplete.play();
+
+        // Clear power-up timer
+        if (activePowerUp) {
+            clearTimeout(powerUpTimer);
+            activePowerUp = null;
         }
-        
-        // --- UI Updates ---
-        function addScore(points) {
-            score += points;
-            updateScoreUI();
+
+        // Hide player
+        player.visible = false;
+    }
+
+    // --- UI Updates ---
+    function addScore(points) {
+        score += points;
+        updateScoreUI();
+    }
+
+    function updateScoreUI() {
+        scoreUI.textContent = 'SCORE: ' + score;
+    }
+
+    function updateLivesUI() {
+        livesUI.textContent = 'LIVES: ' + lives;
+    }
+
+    function updateLevelUI() {
+        levelUI.textContent = 'LEVEL: ' + level;
+    }
+
+    function updatePowerUpUI() {
+        let powerText = 'POWER: ';
+
+        switch(activePowerUp) {
+            case 'rapidFire': powerText += 'RAPID FIRE'; break;
+            case 'shield': powerText += 'SHIELD'; break;
+            case 'superProjectile': powerText += 'SUPER SHOT'; break;
+            default: powerText += 'NONE';
         }
-        
-        function updateScoreUI() {
-            scoreUI.textContent = 'SCORE: ' + score;
+
+        powerUpUI.textContent = powerText;
+    }
+
+    // --- Animation Loop ---
+    function animate() {
+        requestAnimationFrame(animate);
+
+        // Calculate delta time
+        const currentTime = performance.now();
+        const deltaTime = currentTime - lastFrameTime;
+        lastFrameTime = currentTime;
+
+        // Update game state
+        if (!isPaused) {
+            update(deltaTime);
         }
-        
-        function updateLivesUI() {
-            livesUI.textContent = 'LIVES: ' + lives;
+
+        // Render
+        renderer.render(scene, camera);
+    }
+
+    // --- Event Handlers ---
+    function onWindowResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    function onKeyDown(event) {
+        keyState[event.key] = true;
+
+        // Handle firing
+        if (gameState === 'playing' && event.key === ' ') {
+            // Create super projectile if power-up is active
+            createProjectile(activePowerUp === 'superProjectile');
         }
-        
-        function updateLevelUI() {
-            levelUI.textContent = 'LEVEL: ' + level;
+
+        // Toggle pause
+        if (gameState === 'playing' && event.key === 'p') {
+            isPaused = !isPaused;
+            pauseScreen.style.display = isPaused ? 'block' : 'none';
         }
-        
-        function updatePowerUpUI() {
-            let powerText = 'POWER: ';
-            
-            switch(activePowerUp) {
-                case 'rapidFire': powerText += 'RAPID FIRE'; break;
-                case 'shield': powerText += 'SHIELD'; break;
-                case 'superProjectile': powerText += 'SUPER SHOT'; break;
-                default: powerText += 'NONE';
-            }
-            
-            powerUpUI.textContent = powerText;
+
+        // Prevent scrolling when pressing space or arrow keys
+        if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+            event.preventDefault();
         }
-        
-        // --- Animation Loop ---
-        function animate() {
-            requestAnimationFrame(animate);
-            
-            // Calculate delta time
-            const currentTime = performance.now();
-            const deltaTime = currentTime - lastFrameTime;
-            lastFrameTime = currentTime;
-            
-            // Update game state
-            if (!isPaused) {
-                update(deltaTime);
-            }
-            
-            // Render
-            renderer.render(scene, camera);
-        }
-        
-        // --- Event Handlers ---
-        function onWindowResize() {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        }
-        
-        function onKeyDown(event) {
-            keyState[event.key] = true;
-            
-            // Handle firing
-            if (gameState === 'playing' && event.key === ' ') {
-                // Create super projectile if power-up is active
-                createProjectile(activePowerUp === 'superProjectile');
-            }
-            
-            // Toggle pause
-            if (gameState === 'playing' && event.key === 'p') {
-                isPaused = !isPaused;
-                pauseScreen.style.display = isPaused ? 'block' : 'none';
-            }
-            
-            // Prevent scrolling when pressing space or arrow keys
-            if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
-                event.preventDefault();
-            }
-        }
-        
-        function onKeyUp(event) {
-            keyState[event.key] = false;
-        }
-        
-        // --- Start the Game ---
-        init();
-    </script>
+    }
+
+    function onKeyUp(event) {
+        keyState[event.key] = false;
+    }
+
+    // --- Start the Game ---
+    init();
+</script>
 </body>
 </html>
