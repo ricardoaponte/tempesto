@@ -155,7 +155,7 @@
 <div id="pause-screen">PAUSED</div>
 
 <div id="instructions">
-    ARROWS: MOVE | SPACE: FIRE | P/ENTER: PAUSE | MOUSE: ROTATE TUNNEL | CLICK: TOGGLE ROTATION
+    ARROWS: MOVE | SPACE: FIRE | P/ENTER: PAUSE | MOUSE: ROTATE TUNNEL | CLICK: TOGGLE ROTATION | AI: AUTO PLAY
 </div>
 
 <div id="game-over">
@@ -209,6 +209,13 @@
             <option value="large">LARGE</option>
         </select>
     </div>
+    <div>
+        <label for="ai-player-select">AI PLAYER:</label>
+        <select id="ai-player-select">
+            <option value="off" selected>OFF</option>
+            <option value="on">ON</option>
+        </select>
+    </div>
     <button id="start-button">START GAME</button>
 </div>
 
@@ -225,6 +232,11 @@
     const powerUps = [];
     const explosions = [];
     const keyState = {};
+
+    // AI player variables
+    let isAIEnabled = false;
+    let aiDecisionTimer = 0;
+    const AI_DECISION_INTERVAL = 10; // Make decisions every 10 frames
 
     // Mouse tracking variables
     let mouseX = 0;
@@ -310,6 +322,7 @@
     const difficultySelect = document.getElementById('difficulty-select');
     const webTypeSelect = document.getElementById('web-type-select');
     const tubeWidthSelect = document.getElementById('tube-width-select');
+    const aiPlayerSelect = document.getElementById('ai-player-select');
     const startButton = document.getElementById('start-button');
 
     // --- Save and Load Rotation State ---
@@ -719,7 +732,7 @@
     }
 
     // --- Set Game Settings ---
-    function setGameSettings(speed, difficulty, web, width) {
+    function setGameSettings(speed, difficulty, web, width, ai) {
         // Player Speed
         switch(speed) {
             case 'slow': playerLaneChangeRate = 10; break;
@@ -756,6 +769,9 @@
 
         // Tube Width
         tubeWidth = width;
+
+        // AI Player
+        isAIEnabled = ai === 'on';
     }
 
     // --- Start Game Function ---
@@ -767,8 +783,9 @@
         const selectedDifficulty = difficultySelect.value;
         const selectedWebType = webTypeSelect.value;
         const selectedTubeWidth = tubeWidthSelect.value;
+        const selectedAIPlayer = aiPlayerSelect.value;
 
-        setGameSettings(selectedSpeed, selectedDifficulty, selectedWebType, selectedTubeWidth);
+        setGameSettings(selectedSpeed, selectedDifficulty, selectedWebType, selectedTubeWidth, selectedAIPlayer);
 
         // Create the web based on selected type
         createWeb(selectedWebType);
@@ -1244,6 +1261,9 @@
 
         const currentFrame = renderer.info.render.frame;
 
+        // Update AI player if enabled
+        updateAIPlayer(currentFrame);
+
         // --- Update player position to account for tunnel rotation ---
         if (webMesh) {
             updatePlayerPosition();
@@ -1605,6 +1625,184 @@
         powerUpUI.textContent = powerText;
     }
 
+    // --- AI Player Logic ---
+    function updateAIPlayer(currentFrame) {
+        if (!isAIEnabled || gameState !== 'playing' || isPaused) {
+            return;
+        }
+
+        // Only make decisions at certain intervals to avoid erratic behavior
+        aiDecisionTimer++;
+        if (aiDecisionTimer < AI_DECISION_INTERVAL) {
+            return;
+        }
+        aiDecisionTimer = 0;
+
+        // Find the closest enemy in the current lane
+        let closestEnemyInLane = null;
+        let closestEnemyDistance = Infinity;
+
+        // Find enemies in adjacent lanes
+        let enemiesInAdjacentLanes = [];
+
+        // Find power-ups
+        let closestPowerUp = null;
+        let closestPowerUpDistance = Infinity;
+
+        // Check all enemies
+        for (let i = 0; i < enemies.length; i++) {
+            const enemy = enemies[i];
+
+            // Calculate distance to player on z-axis
+            const distanceToPlayer = enemy.position.z - PLAYER_Z;
+
+            // Check if enemy is in the current lane
+            if (enemy.laneIndex === playerCurrentLaneIndex) {
+                if (distanceToPlayer < closestEnemyDistance && distanceToPlayer > 0) {
+                    closestEnemyInLane = enemy;
+                    closestEnemyDistance = distanceToPlayer;
+                }
+            }
+            // Check if enemy is in adjacent lanes
+            else if (
+                enemy.laneIndex === (playerCurrentLaneIndex + 1) % NUM_LANES ||
+                enemy.laneIndex === (playerCurrentLaneIndex - 1 + NUM_LANES) % NUM_LANES
+            ) {
+                enemiesInAdjacentLanes.push({
+                    enemy: enemy,
+                    distance: distanceToPlayer
+                });
+            }
+        }
+
+        // Check all power-ups
+        for (let i = 0; i < powerUps.length; i++) {
+            const powerUp = powerUps[i];
+            const distanceToPlayer = Math.abs(powerUp.position.z - PLAYER_Z);
+
+            if (distanceToPlayer < closestPowerUpDistance) {
+                closestPowerUp = powerUp;
+                closestPowerUpDistance = distanceToPlayer;
+            }
+        }
+
+        // Decision making
+        let shouldMove = false;
+        let moveDirection = null;
+        let shouldFire = false;
+
+        // If there's an enemy in the current lane, either fire or move
+        if (closestEnemyInLane) {
+            if (closestEnemyDistance < 10) {
+                // Enemy is close, decide whether to fire or move
+                if (closestEnemyDistance < 5 || Math.random() < 0.7) {
+                    // Fire at the enemy
+                    shouldFire = true;
+                } else {
+                    // Move to an adjacent lane
+                    shouldMove = true;
+                    // Choose the lane with fewer or more distant enemies
+                    moveDirection = decideBestLaneToMove(enemiesInAdjacentLanes);
+                }
+            } else {
+                // Enemy is far, fire at it
+                shouldFire = true;
+            }
+        }
+        // If there's a power-up, try to collect it
+        else if (closestPowerUp && closestPowerUpDistance < 15) {
+            // Try to align with the power-up
+            const powerUpLaneIndex = findLaneForPosition(closestPowerUp.position);
+            if (powerUpLaneIndex !== playerCurrentLaneIndex) {
+                shouldMove = true;
+                moveDirection = powerUpLaneIndex > playerCurrentLaneIndex ? 'left' : 'right';
+            }
+        }
+        // If there are enemies in adjacent lanes, move away from them
+        else if (enemiesInAdjacentLanes.length > 0) {
+            // Find the closest enemy in adjacent lanes
+            let closestAdjacentEnemy = enemiesInAdjacentLanes.reduce((closest, current) => {
+                return (current.distance < closest.distance) ? current : closest;
+            }, { distance: Infinity });
+
+            if (closestAdjacentEnemy.distance < 8) {
+                // Move away from the closest adjacent enemy
+                shouldMove = true;
+                moveDirection = closestAdjacentEnemy.enemy.laneIndex === (playerCurrentLaneIndex + 1) % NUM_LANES ? 'right' : 'left';
+            } else {
+                // Randomly fire or move to keep the game interesting
+                if (Math.random() < 0.3) {
+                    shouldFire = true;
+                } else if (Math.random() < 0.2) {
+                    shouldMove = true;
+                    moveDirection = Math.random() < 0.5 ? 'left' : 'right';
+                }
+            }
+        }
+        // If there are no immediate threats or targets, occasionally move or fire randomly
+        else {
+            if (Math.random() < 0.2) {
+                shouldFire = true;
+            }
+            if (Math.random() < 0.1) {
+                shouldMove = true;
+                moveDirection = Math.random() < 0.5 ? 'left' : 'right';
+            }
+        }
+
+        // Execute decisions
+        if (shouldFire) {
+            createProjectile(activePowerUp === 'superProjectile');
+        }
+
+        if (shouldMove && currentFrame >= lastLaneChangeFrame + playerLaneChangeRate) {
+            let newLaneIndex = playerCurrentLaneIndex;
+
+            if (moveDirection === 'left') {
+                newLaneIndex = (playerCurrentLaneIndex + 1) % NUM_LANES;
+            } else if (moveDirection === 'right') {
+                newLaneIndex = (playerCurrentLaneIndex - 1 + NUM_LANES) % NUM_LANES;
+            } else if (typeof moveDirection === 'number') {
+                // If moveDirection is a specific lane index
+                newLaneIndex = moveDirection;
+            }
+
+            playerCurrentLaneIndex = newLaneIndex;
+            updatePlayerPosition();
+            lastLaneChangeFrame = currentFrame;
+        }
+    }
+
+    // Helper function to decide the best lane to move to
+    function decideBestLaneToMove(enemiesInAdjacentLanes) {
+        // Count enemies in each adjacent lane
+        let leftLaneIndex = (playerCurrentLaneIndex + 1) % NUM_LANES;
+        let rightLaneIndex = (playerCurrentLaneIndex - 1 + NUM_LANES) % NUM_LANES;
+
+        let leftLaneEnemies = enemiesInAdjacentLanes.filter(e => e.enemy.laneIndex === leftLaneIndex);
+        let rightLaneEnemies = enemiesInAdjacentLanes.filter(e => e.enemy.laneIndex === rightLaneIndex);
+
+        // Choose the lane with fewer enemies
+        if (leftLaneEnemies.length < rightLaneEnemies.length) {
+            return 'left';
+        } else if (rightLaneEnemies.length < leftLaneEnemies.length) {
+            return 'right';
+        } else {
+            // If equal, choose randomly
+            return Math.random() < 0.5 ? 'left' : 'right';
+        }
+    }
+
+    // Helper function to find the lane index for a given position
+    function findLaneForPosition(position) {
+        // This is a simplified version that works best for circular webs
+        // For other web types, more complex calculations would be needed
+        let angle = Math.atan2(position.y, position.x);
+        if (angle < 0) angle += Math.PI * 2;
+
+        return Math.floor(angle / LANE_ANGLE_STEP) % NUM_LANES;
+    }
+
     // --- Web Rotation Update ---
     function updateWebRotation() {
         if (webMesh) {
@@ -1717,9 +1915,10 @@
         const selectedDifficulty = difficultySelect.value;
         const selectedWebType = webTypeSelect.value;
         const selectedTubeWidth = tubeWidthSelect.value;
+        const selectedAIPlayer = aiPlayerSelect.value;
 
         // Apply settings
-        setGameSettings(selectedSpeed, selectedDifficulty, selectedWebType, selectedTubeWidth);
+        setGameSettings(selectedSpeed, selectedDifficulty, selectedWebType, selectedTubeWidth, selectedAIPlayer);
 
         // Recreate the web if the web type has changed
         if (webType !== selectedWebType) {
