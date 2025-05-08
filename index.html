@@ -200,6 +200,15 @@
             <option value="random">RANDOM</option>
         </select>
     </div>
+    <div>
+        <label for="tube-width-select">TUBE WIDTH:</label>
+        <select id="tube-width-select">
+            <option value="wire">WIRE</option>
+            <option value="small">SMALL</option>
+            <option value="medium" selected>MEDIUM</option>
+            <option value="large">LARGE</option>
+        </select>
+    </div>
     <button id="start-button">START GAME</button>
 </div>
 
@@ -242,6 +251,7 @@
     const WEB_RADIUS = 10;
     let LANE_ANGLE_STEP = (Math.PI * 2) / NUM_LANES;
     let webType = 'circle';
+    let tubeWidth = 'medium'; // Options: 'wire', 'small', 'medium', 'large'
 
     // Fixed Z positions
     const PLAYER_Z = WEB_DEPTH / 2;
@@ -299,6 +309,7 @@
     const speedSelect = document.getElementById('speed-select');
     const difficultySelect = document.getElementById('difficulty-select');
     const webTypeSelect = document.getElementById('web-type-select');
+    const tubeWidthSelect = document.getElementById('tube-width-select');
     const startButton = document.getElementById('start-button');
 
     // --- Save and Load Rotation State ---
@@ -489,8 +500,16 @@
             // Create a path for the tube
             const path = new THREE.CatmullRomCurve3([startPoint, endPoint]);
 
-            // Create tube geometry with radius proportional to web size
-            const tubeRadius = WEB_RADIUS * 0.02; // 2% of web radius
+            // Create tube geometry with radius proportional to web size and selected width
+            let tubeRadiusMultiplier;
+            switch(tubeWidth) {
+                case 'wire': tubeRadiusMultiplier = 0.0005; break; // 0.5% of web radius
+                case 'small': tubeRadiusMultiplier = 0.001; break; // 1% of web radius
+                case 'medium': tubeRadiusMultiplier = 0.002; break; // 2% of web radius (default)
+                case 'large': tubeRadiusMultiplier = 0.004; break; // 4% of web radius
+                default: tubeRadiusMultiplier = 0.02; // Default to medium
+            }
+            const tubeRadius = WEB_RADIUS * tubeRadiusMultiplier;
             const tubeGeometry = new THREE.TubeGeometry(
                 path,
                 1,              // tubularSegments
@@ -700,7 +719,7 @@
     }
 
     // --- Set Game Settings ---
-    function setGameSettings(speed, difficulty, web) {
+    function setGameSettings(speed, difficulty, web, width) {
         // Player Speed
         switch(speed) {
             case 'slow': playerLaneChangeRate = 10; break;
@@ -734,6 +753,9 @@
 
         // Web Type
         webType = web;
+
+        // Tube Width
+        tubeWidth = width;
     }
 
     // --- Start Game Function ---
@@ -744,8 +766,9 @@
         const selectedSpeed = speedSelect.value;
         const selectedDifficulty = difficultySelect.value;
         const selectedWebType = webTypeSelect.value;
+        const selectedTubeWidth = tubeWidthSelect.value;
 
-        setGameSettings(selectedSpeed, selectedDifficulty, selectedWebType);
+        setGameSettings(selectedSpeed, selectedDifficulty, selectedWebType, selectedTubeWidth);
 
         // Create the web based on selected type
         createWeb(selectedWebType);
@@ -1637,6 +1660,12 @@
         if (gameState === 'playing' && (event.key === 'p' || event.key === 'Enter')) {
             isPaused = !isPaused;
             pauseScreen.style.display = isPaused ? 'block' : 'none';
+            menuElement.style.display = isPaused ? 'block' : 'none';
+
+            if (!isPaused) {
+                // Apply settings when resuming
+                applyGameSettings();
+            }
         }
 
         // Prevent scrolling when pressing space, arrow keys, or Enter
@@ -1678,6 +1707,26 @@
 
             // Save rotation state to localStorage
             saveRotationState();
+        }
+    }
+
+    // --- Apply Game Settings ---
+    function applyGameSettings() {
+        // Get selected settings
+        const selectedSpeed = speedSelect.value;
+        const selectedDifficulty = difficultySelect.value;
+        const selectedWebType = webTypeSelect.value;
+        const selectedTubeWidth = tubeWidthSelect.value;
+
+        // Apply settings
+        setGameSettings(selectedSpeed, selectedDifficulty, selectedWebType, selectedTubeWidth);
+
+        // Recreate the web if the web type has changed
+        if (webType !== selectedWebType) {
+            createWeb(selectedWebType);
+            // Reset player position after new web creation
+            playerCurrentLaneIndex = Math.floor(NUM_LANES / 2);
+            updatePlayerPosition();
         }
     }
 
