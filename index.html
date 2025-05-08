@@ -155,7 +155,7 @@
 <div id="pause-screen">PAUSED</div>
 
 <div id="instructions">
-    ARROWS: MOVE | SPACE: FIRE | P: PAUSE
+    ARROWS: MOVE | SPACE: FIRE | P/ENTER: PAUSE | MOUSE: ROTATE TUNNEL | CLICK: TOGGLE ROTATION
 </div>
 
 <div id="game-over">
@@ -216,6 +216,21 @@
     const powerUps = [];
     const explosions = [];
     const keyState = {};
+
+    // Mouse tracking variables
+    let mouseX = 0;
+    let mouseY = 0;
+    let targetRotationX = 0;
+    let targetRotationY = 0;
+    let isRotationEnabled = true; // Flag to enable/disable tunnel rotation
+
+    // localStorage keys
+    const STORAGE_KEY_ROTATION_X = 'tempest3d_rotationX';
+    const STORAGE_KEY_ROTATION_Y = 'tempest3d_rotationY';
+    const STORAGE_KEY_ROTATION_ENABLED = 'tempest3d_rotationEnabled';
+
+    // Debounce timer for saving rotation state
+    let saveRotationTimer = null;
 
     // Game State
     let gameState = 'menu'; // 'menu', 'playing', 'paused', 'gameover', 'levelcomplete'
@@ -286,8 +301,44 @@
     const webTypeSelect = document.getElementById('web-type-select');
     const startButton = document.getElementById('start-button');
 
+    // --- Save and Load Rotation State ---
+    function saveRotationState() {
+        try {
+            localStorage.setItem(STORAGE_KEY_ROTATION_X, targetRotationX);
+            localStorage.setItem(STORAGE_KEY_ROTATION_Y, targetRotationY);
+            localStorage.setItem(STORAGE_KEY_ROTATION_ENABLED, isRotationEnabled);
+        } catch (e) {
+            console.error("Failed to save rotation state to localStorage:", e);
+        }
+    }
+
+    function loadRotationState() {
+        try {
+            const savedRotationX = localStorage.getItem(STORAGE_KEY_ROTATION_X);
+            const savedRotationY = localStorage.getItem(STORAGE_KEY_ROTATION_Y);
+            const savedRotationEnabled = localStorage.getItem(STORAGE_KEY_ROTATION_ENABLED);
+
+            if (savedRotationX !== null) {
+                targetRotationX = parseFloat(savedRotationX);
+            }
+
+            if (savedRotationY !== null) {
+                targetRotationY = parseFloat(savedRotationY);
+            }
+
+            if (savedRotationEnabled !== null) {
+                isRotationEnabled = savedRotationEnabled === 'true';
+            }
+        } catch (e) {
+            console.error("Failed to load rotation state from localStorage:", e);
+        }
+    }
+
     // --- Initialization Function ---
     function init() {
+        // Load saved rotation state
+        loadRotationState();
+
         // Scene setup
         scene = new THREE.Scene();
         scene.background = new THREE.Color(0x000000);
@@ -330,6 +381,8 @@
         window.addEventListener('resize', onWindowResize);
         window.addEventListener('keydown', onKeyDown);
         window.addEventListener('keyup', onKeyUp);
+        window.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('click', onMouseClick);
 
         // Button listeners
         startButton.addEventListener('click', startGame);
@@ -414,19 +467,61 @@
         const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
         geometry.translate(0, 0, -WEB_DEPTH / 2);
 
-        // Create enhanced wireframe with glow effect
+        // Create enhanced wireframe with tube-like effect
         const edges = new THREE.EdgesGeometry(geometry);
-        const material = new THREE.LineBasicMaterial({
-            color: 0x00ffff,
-            linewidth: 2,
-            transparent: true,
-            opacity: 0.8
-        });
-        webMesh = new THREE.LineSegments(edges, material);
 
-        // Add some random variation to make the web more interesting
-        webMesh.rotation.x = 0;
-        webMesh.rotation.y = Math.random() * 0.2 - 0.1;
+        // Create a group to hold all tube segments
+        webMesh = new THREE.Group();
+
+        // Get the positions from the edges geometry
+        const positions = edges.attributes.position.array;
+
+        // Create tube segments for each edge
+        for (let i = 0; i < positions.length; i += 6) {
+            // Each edge has two vertices (start and end)
+            const startPoint = new THREE.Vector3(
+                positions[i], positions[i+1], positions[i+2]
+            );
+            const endPoint = new THREE.Vector3(
+                positions[i+3], positions[i+4], positions[i+5]
+            );
+
+            // Create a path for the tube
+            const path = new THREE.CatmullRomCurve3([startPoint, endPoint]);
+
+            // Create tube geometry with radius proportional to web size
+            const tubeRadius = WEB_RADIUS * 0.02; // 2% of web radius
+            const tubeGeometry = new THREE.TubeGeometry(
+                path,
+                1,              // tubularSegments
+                tubeRadius,     // radius
+                8,              // radialSegments
+                false           // closed
+            );
+
+            // Create material with glow effect
+            const tubeMaterial = new THREE.MeshPhongMaterial({
+                color: 0x00ffff,
+                emissive: 0x00ffff,
+                emissiveIntensity: 0.3,
+                transparent: true,
+                opacity: 0.8,
+                shininess: 30
+            });
+
+            // Create mesh and add to group
+            const tubeMesh = new THREE.Mesh(tubeGeometry, tubeMaterial);
+            webMesh.add(tubeMesh);
+        }
+
+        // Apply saved rotation values if available, otherwise use neutral position
+        if (targetRotationX !== 0 || targetRotationY !== 0) {
+            webMesh.rotation.x = targetRotationX;
+            webMesh.rotation.y = targetRotationY;
+        } else {
+            webMesh.rotation.x = 0;
+            webMesh.rotation.y = 0;
+        }
 
         scene.add(webMesh);
     }
@@ -524,6 +619,7 @@
     function updatePlayerPosition() {
         // Calculate position based on current lane and web type
         let x, y;
+        let angle;
 
         if (webType === 'square') {
             // For square web, place player at the midpoint of each side
@@ -546,12 +642,11 @@
                     break;
             }
             // Rotation to face inward
-            const angle = (playerCurrentLaneIndex * Math.PI / 2) + Math.PI / 2;
-            player.rotation.z = angle;
+            angle = (playerCurrentLaneIndex * Math.PI / 2) + Math.PI / 2;
         }
         else if (webType === 'triangle') {
             // For triangle web, position at the three corners
-            const angle = (playerCurrentLaneIndex * Math.PI * 2 / 3);
+            angle = (playerCurrentLaneIndex * Math.PI * 2 / 3);
             const size = WEB_RADIUS * 1.8;
             if (playerCurrentLaneIndex === 0) {
                 x = 0;
@@ -563,18 +658,45 @@
                 x = size;
                 y = -size/2;
             }
-            player.rotation.z = angle + Math.PI / 2;
         }
         else {
             // For circle or random polygon
-            const angle = playerCurrentLaneIndex * LANE_ANGLE_STEP;
+            angle = playerCurrentLaneIndex * LANE_ANGLE_STEP;
             x = WEB_RADIUS * Math.cos(angle);
             y = WEB_RADIUS * Math.sin(angle);
-            player.rotation.z = angle + Math.PI / 2;
         }
 
-        player.position.set(x, y, PLAYER_Z);
-        player.rotation.x = 0;
+        // Create a position vector
+        const position = new THREE.Vector3(x, y, PLAYER_Z);
+
+        // Apply tunnel rotation to player position
+        if (webMesh) {
+            // Create a rotation matrix from the web's rotation
+            const rotationMatrix = new THREE.Matrix4();
+            rotationMatrix.makeRotationFromEuler(new THREE.Euler(
+                webMesh.rotation.x,
+                webMesh.rotation.y,
+                0 // Don't apply z rotation as it's just for visual effect
+            ));
+
+            // Apply rotation to position
+            position.applyMatrix4(rotationMatrix);
+        }
+
+        // Update player position
+        player.position.copy(position);
+
+        // Update player rotation to face inward and account for tunnel rotation
+        player.rotation.z = angle + Math.PI / 2;
+
+        // Apply tunnel rotation to player orientation
+        if (webMesh) {
+            player.rotation.x = webMesh.rotation.x;
+            player.rotation.y = webMesh.rotation.y;
+        } else {
+            player.rotation.x = 0;
+            player.rotation.y = 0;
+        }
     }
 
     // --- Set Game Settings ---
@@ -640,6 +762,9 @@
         activePowerUp = null;
         powerUpTimer = 0;
 
+        // Load saved rotation state or use defaults
+        loadRotationState();
+
         // Clear existing game objects
         clearGameObjects();
 
@@ -679,6 +804,9 @@
         // Reset level-specific variables
         enemiesKilled = 0;
         enemySpawnTimer = 0;
+
+        // Save current rotation state before transitioning to next level
+        saveRotationState();
 
         // Choose a new random web shape for variety
         const webTypes = ['circle', 'square', 'triangle', 'pentagon', 'hexagon', 'octagon', 'random'];
@@ -765,9 +893,28 @@
         projectile.position.copy(player.position);
         projectile.position.z -= 1.5;
 
+        // Copy player's rotation to align with tunnel rotation
+        projectile.rotation.copy(player.rotation);
+
         // Store projectile properties
         projectile.laneIndex = playerCurrentLaneIndex;
         projectile.isSuper = isSuperProjectile;
+
+        // Store direction vector for movement (accounting for tunnel rotation)
+        const direction = new THREE.Vector3(0, 0, -1);
+        if (webMesh) {
+            // Create a rotation matrix from the web's rotation
+            const rotationMatrix = new THREE.Matrix4();
+            rotationMatrix.makeRotationFromEuler(new THREE.Euler(
+                webMesh.rotation.x,
+                webMesh.rotation.y,
+                0 // Don't apply z rotation as it's just for visual effect
+            ));
+
+            // Apply rotation to direction
+            direction.applyMatrix4(rotationMatrix);
+        }
+        projectile.direction = direction.normalize();
 
         scene.add(projectile);
         projectiles.push(projectile);
@@ -807,6 +954,7 @@
 
         // Position depends on web type
         let x, y;
+        let angle;
 
         if (webType === 'square') {
             switch (laneIndex) {
@@ -827,6 +975,7 @@
                     y = 0;
                     break;
             }
+            angle = (laneIndex * (Math.PI * 2) / NUM_LANES);
         }
         else if (webType === 'triangle') {
             const size = WEB_RADIUS * 1.8;
@@ -840,22 +989,41 @@
                 x = size;
                 y = -size/2;
             }
+            angle = (laneIndex * (Math.PI * 2) / NUM_LANES);
         }
         else {
-            const angle = laneIndex * LANE_ANGLE_STEP;
+            angle = laneIndex * LANE_ANGLE_STEP;
             x = WEB_RADIUS * Math.cos(angle);
             y = WEB_RADIUS * Math.sin(angle);
         }
 
-        enemy.position.set(x, y, ENEMY_START_Z);
+        // Create a position vector
+        const position = new THREE.Vector3(x, y, ENEMY_START_Z);
+
+        // Apply tunnel rotation to enemy position
+        if (webMesh) {
+            // Create a rotation matrix from the web's rotation
+            const rotationMatrix = new THREE.Matrix4();
+            rotationMatrix.makeRotationFromEuler(new THREE.Euler(
+                webMesh.rotation.x,
+                webMesh.rotation.y,
+                0 // Don't apply z rotation as it's just for visual effect
+            ));
+
+            // Apply rotation to position
+            position.applyMatrix4(rotationMatrix);
+        }
+
+        // Set enemy position
+        enemy.position.copy(position);
 
         // Rotate enemy to face roughly towards the center
-        if (webType === 'square' || webType === 'triangle') {
-            const angle = (laneIndex * (Math.PI * 2) / NUM_LANES);
-            enemy.rotation.z = angle;
-        } else {
-            const angle = laneIndex * LANE_ANGLE_STEP;
-            enemy.rotation.z = angle;
+        enemy.rotation.z = angle;
+
+        // Apply tunnel rotation to enemy orientation
+        if (webMesh) {
+            enemy.rotation.x = webMesh.rotation.x;
+            enemy.rotation.y = webMesh.rotation.y;
         }
 
         // Add pulsating animation
@@ -866,6 +1034,22 @@
         enemy.laneIndex = laneIndex;
         enemy.isSpecial = isSpecial;
         enemy.points = isSpecial ? 200 : 100;
+
+        // Store direction vector for movement (accounting for tunnel rotation)
+        const direction = new THREE.Vector3(0, 0, 1);
+        if (webMesh) {
+            // Create a rotation matrix from the web's rotation
+            const rotationMatrix = new THREE.Matrix4();
+            rotationMatrix.makeRotationFromEuler(new THREE.Euler(
+                webMesh.rotation.x,
+                webMesh.rotation.y,
+                0 // Don't apply z rotation as it's just for visual effect
+            ));
+
+            // Apply rotation to direction
+            direction.applyMatrix4(rotationMatrix);
+        }
+        enemy.direction = direction.normalize();
 
         scene.add(enemy);
         enemies.push(enemy);
@@ -903,9 +1087,31 @@
         // Position at enemy death location (passed in as argument)
         powerUp.position.copy(position);
 
+        // Apply tunnel rotation to power-up orientation
+        if (webMesh) {
+            powerUp.rotation.x = webMesh.rotation.x;
+            powerUp.rotation.y = webMesh.rotation.y;
+        }
+
         // Store power-up properties
         powerUp.powerType = powerType;
         powerUp.rotationSpeed = 0.05;
+
+        // Store direction vector for movement (accounting for tunnel rotation)
+        const direction = new THREE.Vector3(0, 0, 1);
+        if (webMesh) {
+            // Create a rotation matrix from the web's rotation
+            const rotationMatrix = new THREE.Matrix4();
+            rotationMatrix.makeRotationFromEuler(new THREE.Euler(
+                webMesh.rotation.x,
+                webMesh.rotation.y,
+                0 // Don't apply z rotation as it's just for visual effect
+            ));
+
+            // Apply rotation to direction
+            direction.applyMatrix4(rotationMatrix);
+        }
+        powerUp.direction = direction.normalize();
 
         scene.add(powerUp);
         powerUps.push(powerUp);
@@ -1015,9 +1221,9 @@
 
         const currentFrame = renderer.info.render.frame;
 
-        // --- Animate Web ---
+        // --- Update player position to account for tunnel rotation ---
         if (webMesh) {
-            webMesh.rotation.z += 0.0005; // Subtle rotation for visual effect
+            updatePlayerPosition();
         }
 
         // --- Player Movement ---
@@ -1046,7 +1252,16 @@
         // --- Update Projectiles ---
         for (let i = projectiles.length - 1; i >= 0; i--) {
             const projectile = projectiles[i];
-            projectile.position.z -= PROJECTILE_SPEED;
+
+            // Move projectile along its direction vector (accounting for tunnel rotation)
+            if (projectile.direction) {
+                projectile.position.x += projectile.direction.x * PROJECTILE_SPEED;
+                projectile.position.y += projectile.direction.y * PROJECTILE_SPEED;
+                projectile.position.z += projectile.direction.z * PROJECTILE_SPEED;
+            } else {
+                // Fallback for projectiles created before this update
+                projectile.position.z -= PROJECTILE_SPEED;
+            }
 
             // Super projectiles have a trailing effect
             if (projectile.isSuper && Math.random() > 0.5) {
@@ -1089,8 +1304,16 @@
         for (let i = enemies.length - 1; i >= 0; i--) {
             const enemy = enemies[i];
 
-            // Move enemy
-            enemy.position.z += currentEnemySpeed * (enemy.isSpecial ? 1.2 : 1.0);
+            // Move enemy along its direction vector (accounting for tunnel rotation)
+            const speed = currentEnemySpeed * (enemy.isSpecial ? 1.2 : 1.0);
+            if (enemy.direction) {
+                enemy.position.x += enemy.direction.x * speed;
+                enemy.position.y += enemy.direction.y * speed;
+                enemy.position.z += enemy.direction.z * speed;
+            } else {
+                // Fallback for enemies created before this update
+                enemy.position.z += speed;
+            }
 
             // Pulsating animation
             const pulseScale = enemy.initialScale + Math.sin(enemy.pulsePhase) * 0.1;
@@ -1129,8 +1352,16 @@
         for (let i = powerUps.length - 1; i >= 0; i--) {
             const powerUp = powerUps[i];
 
-            // Move power-up towards player
-            powerUp.position.z += currentEnemySpeed * 0.5;
+            // Move power-up towards player along its direction vector (accounting for tunnel rotation)
+            const speed = currentEnemySpeed * 0.5;
+            if (powerUp.direction) {
+                powerUp.position.x += powerUp.direction.x * speed;
+                powerUp.position.y += powerUp.direction.y * speed;
+                powerUp.position.z += powerUp.direction.z * speed;
+            } else {
+                // Fallback for power-ups created before this update
+                powerUp.position.z += speed;
+            }
 
             // Rotate power-up
             powerUp.rotation.y += powerUp.rotationSpeed;
@@ -1269,6 +1500,9 @@
     function endGame() {
         if (gameState !== 'playing') return;
 
+        // Save rotation state before ending the game
+        saveRotationState();
+
         gameState = 'gameover';
         finalScoreUI.textContent = 'FINAL SCORE: ' + score;
         gameOverScreen.style.display = 'block';
@@ -1292,6 +1526,9 @@
     // --- Level Complete Logic ---
     function completedLevel() {
         if (gameState !== 'playing') return;
+
+        // Save rotation state before completing the level
+        saveRotationState();
 
         gameState = 'levelcomplete';
         levelScoreUI.textContent = 'LEVEL ' + level + ' SCORE: ' + score;
@@ -1345,6 +1582,20 @@
         powerUpUI.textContent = powerText;
     }
 
+    // --- Web Rotation Update ---
+    function updateWebRotation() {
+        if (webMesh) {
+            // Smoothly interpolate current rotation towards target rotation only if rotation is enabled and game is not over
+            if (isRotationEnabled && gameState !== 'gameover' && gameState !== 'levelcomplete') {
+                webMesh.rotation.y += (targetRotationY - webMesh.rotation.y) * 0.05;
+                webMesh.rotation.x += (targetRotationX - webMesh.rotation.x) * 0.05;
+            }
+
+            // Keep subtle z-rotation for visual effect regardless of rotation enabled state
+            webMesh.rotation.z += 0.0005;
+        }
+    }
+
     // --- Animation Loop ---
     function animate() {
         requestAnimationFrame(animate);
@@ -1353,6 +1604,9 @@
         const currentTime = performance.now();
         const deltaTime = currentTime - lastFrameTime;
         lastFrameTime = currentTime;
+
+        // Always update web rotation, even when paused
+        updateWebRotation();
 
         // Update game state
         if (!isPaused) {
@@ -1380,19 +1634,51 @@
         }
 
         // Toggle pause
-        if (gameState === 'playing' && event.key === 'p') {
+        if (gameState === 'playing' && (event.key === 'p' || event.key === 'Enter')) {
             isPaused = !isPaused;
             pauseScreen.style.display = isPaused ? 'block' : 'none';
         }
 
-        // Prevent scrolling when pressing space or arrow keys
-        if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+        // Prevent scrolling when pressing space, arrow keys, or Enter
+        if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter'].includes(event.key)) {
             event.preventDefault();
         }
     }
 
     function onKeyUp(event) {
         keyState[event.key] = false;
+    }
+
+    function onMouseMove(event) {
+        // Calculate mouse position relative to the center of the screen
+        mouseX = (event.clientX - window.innerWidth / 2) / (window.innerWidth / 2);
+        mouseY = (event.clientY - window.innerHeight / 2) / (window.innerHeight / 2);
+
+        // Set target rotation based on mouse position only if rotation is enabled and game is not over
+        if (isRotationEnabled && gameState !== 'gameover' && gameState !== 'levelcomplete') {
+            targetRotationY = mouseX * 0.5; // Horizontal movement controls Y rotation
+            targetRotationX = mouseY * 0.3; // Vertical movement controls X rotation
+
+            // Debounced save of rotation state
+            if (saveRotationTimer) {
+                clearTimeout(saveRotationTimer);
+            }
+            saveRotationTimer = setTimeout(() => {
+                saveRotationState();
+                saveRotationTimer = null;
+            }, 500); // Save after 500ms of no movement
+        }
+    }
+
+    function onMouseClick(event) {
+        // Allow toggling rotation if game is playing, even when paused
+        if (gameState === 'playing') {
+            // Toggle rotation enabled flag
+            isRotationEnabled = !isRotationEnabled;
+
+            // Save rotation state to localStorage
+            saveRotationState();
+        }
     }
 
     // --- Start the Game ---
