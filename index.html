@@ -476,8 +476,8 @@
 
     // Web Configuration
     let NUM_LANES = 16;
-    const WEB_DEPTH = 40;
-    const WEB_RADIUS = 10;
+    const WEB_DEPTH = 100;
+    const WEB_RADIUS = 8;
     let LANE_ANGLE_STEP = (Math.PI * 2) / NUM_LANES;
     let webType = 'circle';
     let tubeWidth = 'medium'; // Options: 'wire', 'small', 'medium', 'large'
@@ -493,7 +493,7 @@
     const POWER_UP_CHANCE = 0.15; // 15% chance of power-up spawn per enemy kill
     const POWER_UP_DURATION = 10000; // 10 seconds
     const SPECIAL_ENEMY_CHANCE = 0.1; // 10% chance of special enemy
-
+    const BOMB_POINTS = 3000;
     // Configurable Settings
     let playerLaneChangeRate = 6;
     let currentEnemySpeed = 0.05;
@@ -2070,7 +2070,7 @@
         }
 
         // Check for bomb reward milestone (every 1000 points)
-        const currentMilestone = Math.floor(score / 1000);
+        const currentMilestone = Math.floor(score / BOMB_POINTS);
         if (currentMilestone > lastBombMilestone) {
             // Award a new bomb for each milestone passed
             const newBombs = currentMilestone - lastBombMilestone;
