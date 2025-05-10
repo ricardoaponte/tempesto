@@ -447,9 +447,6 @@
     <h1>GAME OVER</h1>
     <div id="final-score"></div>
     <div id="final-high-score"></div>
-    <div id="ai-restart-countdown" style="display: none; margin-bottom: 10px; color: #ffff00;">
-        AUTO RESTART IN: <span id="countdown-value">10</span>
-    </div>
     <button id="restart-button">RESTART</button>
 </div>
 
@@ -512,44 +509,6 @@
             <option value="1000">1000</option>
         </select>
     </div>
-    <div>
-        <label for="ai-player-select">AI PLAYER:</label>
-        <select id="ai-player-select">
-            <option value="off" selected>OFF</option>
-            <option value="on">ON</option>
-            <option value="auto">AUTO</option>
-        </select>
-    </div>
-    <div id="ai-learning-options"
-         style="display: none; flex-direction: column; align-items: stretch; margin-top: 10px;">
-        <div id="ai-auto-mode-indicator"
-             style="text-align: center; margin-bottom: 10px; color: #ff0000; display: none;">
-            AUTO MODE: AI WILL PLAY CONTINUOUSLY
-        </div>
-        <div style="text-align: left; margin-bottom: 5px;">
-            <span>EPISODES: <span id="ai-episodes">0</span></span>
-        </div>
-        <div style="text-align: left; margin-bottom: 5px;">
-            <span>TOTAL REWARD: <span id="ai-reward">0</span></span>
-        </div>
-        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-            <label for="ai-learning-rate">LEARNING RATE:</label>
-            <select id="ai-learning-rate">
-                <option value="0.05">LOW (0.05)</option>
-                <option value="0.1" selected>MEDIUM (0.1)</option>
-                <option value="0.2">HIGH (0.2)</option>
-            </select>
-        </div>
-        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-            <label for="ai-exploration-rate">EXPLORATION:</label>
-            <select id="ai-exploration-rate">
-                <option value="0.1">LOW (0.1)</option>
-                <option value="0.2" selected>MEDIUM (0.2)</option>
-                <option value="0.3">HIGH (0.3)</option>
-            </select>
-        </div>
-        <button id="ai-reset-button" style="margin-top: 5px;">RESET AI LEARNING</button>
-    </div>
     <button id="start-button">START GAME</button>
 </div>
 
@@ -589,28 +548,6 @@
     const explosions = [];
     const keyState = {};
 
-    // AI player variables
-    let isAIEnabled = false;
-    let isAIAutoMode = false; // Flag for auto mode (continuous learning)
-    let aiDecisionTimer = 0;
-    const AI_DECISION_INTERVAL = 10; // Make decisions every 10 frames
-
-    // AI learning variables
-    let aiLearning = {
-        qTable: {}, // State-action value function
-        learningRate: 0.1, // Alpha - how much to update Q-values
-        discountFactor: 0.9, // Gamma - importance of future rewards
-        explorationRate: 0.2, // Epsilon - probability of random action
-        lastState: null, // Previous state
-        lastAction: null, // Previous action
-        cumulativeReward: 0, // Total reward accumulated
-        episodeCount: 0, // Number of games played
-        initialized: false // Whether the Q-table has been loaded
-    };
-
-    // localStorage keys for AI learning
-    const STORAGE_KEY_Q_TABLE = 'tempest3d_qTable';
-    const STORAGE_KEY_AI_STATS = 'tempest3d_aiStats';
 
     // Mouse tracking variables
     let mouseX = 0;
@@ -632,9 +569,6 @@
     let gameState = 'menu'; // 'menu', 'playing', 'paused', 'gameover', 'levelcomplete'
     let isPaused = false;
 
-    // AI auto-restart variables
-    let aiRestartCountdown = 10; // 10 second countdown
-    let aiRestartCountdownInterval = null;
 
     // Web Configuration
     let NUM_LANES = 16;
@@ -712,21 +646,8 @@
     const webTypeSelect = document.getElementById('web-type-select');
     const tubeWidthSelect = document.getElementById('tube-width-select');
     const livesSelect = document.getElementById('lives-select');
-    const aiPlayerSelect = document.getElementById('ai-player-select');
     const startButton = document.getElementById('start-button');
 
-    // AI auto-restart UI elements
-    const aiRestartCountdownUI = document.getElementById('ai-restart-countdown');
-    const countdownValueUI = document.getElementById('countdown-value');
-
-    // AI learning UI elements
-    const aiLearningOptions = document.getElementById('ai-learning-options');
-    const aiAutoModeIndicator = document.getElementById('ai-auto-mode-indicator');
-    const aiEpisodesDisplay = document.getElementById('ai-episodes');
-    const aiRewardDisplay = document.getElementById('ai-reward');
-    const aiLearningRateSelect = document.getElementById('ai-learning-rate');
-    const aiExplorationRateSelect = document.getElementById('ai-exploration-rate');
-    const aiResetButton = document.getElementById('ai-reset-button');
 
     // --- Save and Load Rotation State ---
     function saveRotationState() {
@@ -1090,20 +1011,6 @@
         if (restartButton) restartButton.addEventListener('click', restartGame);
         if (nextLevelButton) nextLevelButton.addEventListener('click', nextLevel);
 
-        // AI learning listeners
-        if (aiPlayerSelect) aiPlayerSelect.addEventListener('change', toggleAILearningOptions);
-        if (aiLearningRateSelect) aiLearningRateSelect.addEventListener('change', function () {
-            aiLearning.learningRate = parseFloat(this.value);
-            saveAILearningData();
-        });
-        if (aiExplorationRateSelect) aiExplorationRateSelect.addEventListener('change', function () {
-            aiLearning.explorationRate = parseFloat(this.value);
-            saveAILearningData();
-        });
-        if (aiResetButton) aiResetButton.addEventListener('click', resetAILearningData);
-
-        // Initialize AI learning options visibility
-        toggleAILearningOptions();
 
         // Start the animation loop
         lastFrameTime = performance.now();
@@ -1431,7 +1338,7 @@
     }
 
     // --- Set Game Settings ---
-    function setGameSettings(speed, difficulty, web, width, lives, ai) {
+    function setGameSettings(speed, difficulty, web, width, lives) {
         // Player Speed
         switch (speed) {
             case 'slow':
@@ -1484,20 +1391,11 @@
             // This is just to validate the input
         }
 
-        // AI Player
-        isAIEnabled = ai === 'on' || ai === 'auto';
-        isAIAutoMode = ai === 'auto';
-
-        // Toggle AI learning options visibility
-        toggleAILearningOptions();
     }
 
     // --- Start Game Function ---
     function startGame() {
         if (gameState === 'playing') return;
-
-        // Clear AI auto-restart countdown if active
-        clearAIRestartCountdown();
 
         // Get selected settings
         const selectedSpeed = speedSelect.value;
@@ -1505,9 +1403,8 @@
         const selectedWebType = webTypeSelect.value;
         const selectedTubeWidth = tubeWidthSelect.value;
         const selectedLives = livesSelect.value;
-        const selectedAIPlayer = aiPlayerSelect.value;
 
-        setGameSettings(selectedSpeed, selectedDifficulty, selectedWebType, selectedTubeWidth, selectedLives, selectedAIPlayer);
+        setGameSettings(selectedSpeed, selectedDifficulty, selectedWebType, selectedTubeWidth, selectedLives);
 
         // Create the web based on selected type
         createWeb(selectedWebType);
@@ -1526,21 +1423,6 @@
         bombs = 0; // Reset bombs to 0
         lastBombMilestone = 0; // Reset last bomb milestone
 
-        // Reset AI learning state for new episode
-        if (isAIEnabled) {
-            // Increment episode count
-            aiLearning.episodeCount++;
-
-            // Reset last state and action
-            aiLearning.lastState = null;
-            aiLearning.lastAction = null;
-            aiLearning.lastScore = 0;
-            aiLearning.lastLives = lives;
-            aiLearning.lastPowerUp = null;
-
-            // Save AI learning data
-            saveAILearningData();
-        }
 
         // Load saved rotation state or use defaults
         //loadRotationState();
@@ -2023,8 +1905,6 @@
 
         const currentFrame = renderer.info.render.frame;
 
-        // Update AI player if enabled
-        updateAIPlayer(currentFrame);
 
         // --- Update player position to account for tunnel rotation ---
         if (webMesh) {
@@ -2329,73 +2209,9 @@
             activePowerUp = null;
         }
 
-        // Update AI learning for game over
-        if (isAIEnabled && aiLearning.lastState && aiLearning.lastAction) {
-            // Large negative reward for game over
-            const gameOverReward = -150;
-            updateQValue(aiLearning.lastState, aiLearning.lastAction, gameOverReward, null);
 
-            // Reset last state and action
-            aiLearning.lastState = null;
-            aiLearning.lastAction = null;
-
-            // Save AI learning data
-            saveAILearningData();
-        }
-
-        // Start auto-restart countdown if in auto mode or if AI is enabled with learning data
-        if (isAIAutoMode || (isAIEnabled && aiLearning.initialized)) {
-            startAIRestartCountdown();
-        }
     }
 
-    // --- AI Auto-Restart Countdown ---
-    function startAIRestartCountdown() {
-        // If in auto mode, restart immediately without countdown
-        if (isAIAutoMode) {
-            startGame();
-            return;
-        }
-
-        // Clear any existing countdown
-        clearAIRestartCountdown();
-
-        // Reset countdown value
-        aiRestartCountdown = 10;
-        countdownValueUI.textContent = aiRestartCountdown;
-
-        // Show countdown UI
-        aiRestartCountdownUI.style.display = 'block';
-
-        // Start countdown interval
-        aiRestartCountdownInterval = setInterval(updateAIRestartCountdown, 1000);
-    }
-
-    function updateAIRestartCountdown() {
-        // Decrease countdown
-        aiRestartCountdown--;
-        countdownValueUI.textContent = aiRestartCountdown;
-
-        // Check if countdown is complete
-        if (aiRestartCountdown <= 0) {
-            // Clear countdown interval
-            clearAIRestartCountdown();
-
-            // Start a new game
-            startGame();
-        }
-    }
-
-    function clearAIRestartCountdown() {
-        // Clear interval if it exists
-        if (aiRestartCountdownInterval) {
-            clearInterval(aiRestartCountdownInterval);
-            aiRestartCountdownInterval = null;
-        }
-
-        // Hide countdown UI
-        aiRestartCountdownUI.style.display = 'none';
-    }
 
     // --- Level Complete Logic ---
     function completedLevel() {
@@ -2455,19 +2271,6 @@
         // Hide player
         player.visible = false;
 
-        // Update AI learning for level completion
-        if (isAIEnabled && aiLearning.lastState && aiLearning.lastAction) {
-            // Large positive reward for completing a level
-            const levelCompletionReward = 200 + (level * 50); // Increases with level
-            updateQValue(aiLearning.lastState, aiLearning.lastAction, levelCompletionReward, null);
-
-            // Reset last state and action for next level
-            aiLearning.lastState = null;
-            aiLearning.lastAction = null;
-
-            // Save AI learning data
-            saveAILearningData();
-        }
     }
 
     // --- UI Updates ---
@@ -2578,412 +2381,7 @@
         bombsUI.textContent = 'BOMBS: ' + bombs;
     }
 
-    // --- AI Learning Functions ---
 
-    // Save AI learning data to localStorage
-    function saveAILearningData() {
-        try {
-            localStorage.setItem(STORAGE_KEY_Q_TABLE, JSON.stringify(aiLearning.qTable));
-            localStorage.setItem(STORAGE_KEY_AI_STATS, JSON.stringify({
-                cumulativeReward: aiLearning.cumulativeReward,
-                episodeCount: aiLearning.episodeCount,
-                learningRate: aiLearning.learningRate,
-                explorationRate: aiLearning.explorationRate
-            }));
-
-            // Update UI
-            updateAILearningUI();
-        } catch (e) {
-            console.error("Failed to save AI learning data to localStorage:", e);
-        }
-    }
-
-    // Load AI learning data from localStorage
-    function loadAILearningData() {
-        try {
-            const savedQTable = localStorage.getItem(STORAGE_KEY_Q_TABLE);
-            const savedStats = localStorage.getItem(STORAGE_KEY_AI_STATS);
-
-            if (savedQTable) {
-                aiLearning.qTable = JSON.parse(savedQTable);
-                aiLearning.initialized = true;
-            }
-
-            if (savedStats) {
-                const stats = JSON.parse(savedStats);
-                aiLearning.cumulativeReward = stats.cumulativeReward || 0;
-                aiLearning.episodeCount = stats.episodeCount || 0;
-
-                // Load learning parameters if available
-                if (stats.learningRate) aiLearning.learningRate = stats.learningRate;
-                if (stats.explorationRate) aiLearning.explorationRate = stats.explorationRate;
-            }
-
-            // Update UI
-            updateAILearningUI();
-        } catch (e) {
-            console.error("Failed to load AI learning data from localStorage:", e);
-            // Initialize with empty data if loading fails
-            aiLearning.qTable = {};
-            aiLearning.cumulativeReward = 0;
-            aiLearning.episodeCount = 0;
-        }
-    }
-
-    // Reset AI learning data
-    function resetAILearningData() {
-        if (confirm("Are you sure you want to reset AI learning data? This cannot be undone.")) {
-            aiLearning.qTable = {};
-            aiLearning.cumulativeReward = 0;
-            aiLearning.episodeCount = 0;
-            aiLearning.lastState = null;
-            aiLearning.lastAction = null;
-            aiLearning.initialized = true;
-
-            // Save reset data
-            saveAILearningData();
-
-            alert("AI learning data has been reset.");
-        }
-    }
-
-    // Update AI learning UI
-    function updateAILearningUI() {
-        // Check if elements exist before accessing them
-        if (!aiEpisodesDisplay || !aiRewardDisplay || !aiLearningRateSelect || !aiExplorationRateSelect) return;
-
-        // Update episodes and reward display
-        aiEpisodesDisplay.textContent = aiLearning.episodeCount;
-        aiRewardDisplay.textContent = Math.round(aiLearning.cumulativeReward);
-
-        // Update learning rate select
-        for (let i = 0; i < aiLearningRateSelect.options.length; i++) {
-            if (parseFloat(aiLearningRateSelect.options[i].value) === aiLearning.learningRate) {
-                aiLearningRateSelect.selectedIndex = i;
-                break;
-            }
-        }
-
-        // Update exploration rate select
-        for (let i = 0; i < aiExplorationRateSelect.options.length; i++) {
-            if (parseFloat(aiExplorationRateSelect.options[i].value) === aiLearning.explorationRate) {
-                aiExplorationRateSelect.selectedIndex = i;
-                break;
-            }
-        }
-    }
-
-    // Toggle AI learning options visibility
-    function toggleAILearningOptions() {
-        // Check if elements exist before accessing them
-        if (!aiPlayerSelect) return;
-
-        if (aiPlayerSelect.value === 'on' || aiPlayerSelect.value === 'auto') {
-            if (aiLearningOptions) aiLearningOptions.style.display = 'flex';
-
-            // Show or hide auto mode indicator
-            if (aiAutoModeIndicator) {
-                aiAutoModeIndicator.style.display = aiPlayerSelect.value === 'auto' ? 'block' : 'none';
-            }
-
-            // Load AI learning data if not already loaded
-            if (!aiLearning.initialized) {
-                loadAILearningData();
-            } else {
-                updateAILearningUI();
-            }
-        } else {
-            if (aiLearningOptions) aiLearningOptions.style.display = 'none';
-        }
-    }
-
-    // Encode the current game state into a string
-    function encodeGameState() {
-        // Find the closest enemy in the current lane
-        let closestEnemyInLane = null;
-        let closestEnemyDistance = Infinity;
-
-        // Find enemies in adjacent lanes
-        let enemiesInAdjacentLanes = [];
-
-        // Find power-ups
-        let closestPowerUp = null;
-        let closestPowerUpDistance = Infinity;
-
-        // Check all enemies
-        for (let i = 0; i < enemies.length; i++) {
-            const enemy = enemies[i];
-            const distanceToPlayer = enemy.position.z - PLAYER_Z;
-
-            // Check if enemy is in the current lane
-            if (enemy.laneIndex === playerCurrentLaneIndex) {
-                if (distanceToPlayer < closestEnemyDistance && distanceToPlayer > 0) {
-                    closestEnemyInLane = enemy;
-                    closestEnemyDistance = distanceToPlayer;
-                }
-            }
-            // Check if enemy is in adjacent lanes
-            else if (
-              enemy.laneIndex === (playerCurrentLaneIndex + 1) % NUM_LANES ||
-              enemy.laneIndex === (playerCurrentLaneIndex - 1 + NUM_LANES) % NUM_LANES
-            ) {
-                enemiesInAdjacentLanes.push({
-                    enemy: enemy,
-                    distance: distanceToPlayer
-                });
-            }
-        }
-
-        // Check all power-ups
-        for (let i = 0; i < powerUps.length; i++) {
-            const powerUp = powerUps[i];
-            const distanceToPlayer = Math.abs(powerUp.position.z - PLAYER_Z);
-
-            if (distanceToPlayer < closestPowerUpDistance) {
-                closestPowerUp = powerUp;
-                closestPowerUpDistance = distanceToPlayer;
-            }
-        }
-
-        // Discretize the state to reduce state space
-        // Enemy in current lane: none, far, medium, close
-        let enemyInLane = "none";
-        if (closestEnemyInLane) {
-            if (closestEnemyDistance < 5) enemyInLane = "close";
-            else if (closestEnemyDistance < 15) enemyInLane = "medium";
-            else enemyInLane = "far";
-        }
-
-        // Enemies in adjacent lanes: none, left, right, both
-        let enemiesAdjacent = "none";
-        let leftEnemies = enemiesInAdjacentLanes.filter(e =>
-          e.enemy.laneIndex === (playerCurrentLaneIndex + 1) % NUM_LANES);
-        let rightEnemies = enemiesInAdjacentLanes.filter(e =>
-          e.enemy.laneIndex === (playerCurrentLaneIndex - 1 + NUM_LANES) % NUM_LANES);
-
-        if (leftEnemies.length > 0 && rightEnemies.length > 0) enemiesAdjacent = "both";
-        else if (leftEnemies.length > 0) enemiesAdjacent = "left";
-        else if (rightEnemies.length > 0) enemiesAdjacent = "right";
-
-        // Power-up: none, far, close
-        let powerUpState = "none";
-        if (closestPowerUp) {
-            if (closestPowerUpDistance < 10) powerUpState = "close";
-            else powerUpState = "far";
-        }
-
-        // Active power-up: none, rapidFire, shield, superProjectile
-        let activePowerUpState = activePowerUp || "none";
-
-        // Encode the state as a string
-        return `${enemyInLane}|${enemiesAdjacent}|${powerUpState}|${activePowerUpState}`;
-    }
-
-    // Get the Q-value for a state-action pair
-    function getQValue(state, action) {
-        if (!aiLearning.qTable[state]) {
-            aiLearning.qTable[state] = {
-                "fire": 0,
-                "moveLeft": 0,
-                "moveRight": 0,
-                "doNothing": 0
-            };
-        }
-        return aiLearning.qTable[state][action];
-    }
-
-    // Update Q-value based on reward and next state
-    function updateQValue(state, action, reward, nextState) {
-        if (!state || !action) return; // Skip if no previous state or action
-
-        // Get current Q-value
-        const currentQ = getQValue(state, action);
-
-        // Find max Q-value for next state
-        let maxNextQ = 0;
-        if (nextState) {
-            const actions = ["fire", "moveLeft", "moveRight", "doNothing"];
-            maxNextQ = Math.max(...actions.map(a => getQValue(nextState, a)));
-        }
-
-        // Q-learning update formula: Q(s,a) = Q(s,a) + α * [r + γ * max Q(s',a') - Q(s,a)]
-        const newQ = currentQ + aiLearning.learningRate * (
-          reward + aiLearning.discountFactor * maxNextQ - currentQ
-        );
-
-        // Update Q-table
-        if (!aiLearning.qTable[state]) {
-            aiLearning.qTable[state] = {
-                "fire": 0,
-                "moveLeft": 0,
-                "moveRight": 0,
-                "doNothing": 0
-            };
-        }
-        aiLearning.qTable[state][action] = newQ;
-
-        // Update cumulative reward
-        aiLearning.cumulativeReward += reward;
-
-        // Save learning data periodically (every 100 updates)
-        if (Math.random() < 0.01) { // 1% chance to save on each update
-            saveAILearningData();
-        }
-    }
-
-    // Choose an action based on the current state using epsilon-greedy policy
-    function chooseAction(state) {
-        // Exploration: choose random action with probability epsilon
-        if (Math.random() < aiLearning.explorationRate) {
-            const actions = ["fire", "moveLeft", "moveRight", "doNothing"];
-            return actions[Math.floor(Math.random() * actions.length)];
-        }
-
-        // Exploitation: choose action with highest Q-value
-        const qValues = aiLearning.qTable[state] || {
-            "fire": 0,
-            "moveLeft": 0,
-            "moveRight": 0,
-            "doNothing": 0
-        };
-
-        // Find action with highest Q-value
-        let bestAction = "doNothing";
-        let bestValue = qValues[bestAction];
-
-        for (const action in qValues) {
-            if (qValues[action] > bestValue) {
-                bestValue = qValues[action];
-                bestAction = action;
-            }
-        }
-
-        return bestAction;
-    }
-
-    // --- AI Player Logic ---
-    function updateAIPlayer(currentFrame) {
-        if (!isAIEnabled || gameState !== 'playing' || isPaused) {
-            return;
-        }
-
-        // Initialize AI learning if not already done
-        if (!aiLearning.initialized) {
-            loadAILearningData();
-            aiLearning.initialized = true;
-        }
-
-        // Only make decisions at certain intervals to avoid erratic behavior
-        aiDecisionTimer++;
-        if (aiDecisionTimer < AI_DECISION_INTERVAL) {
-            return;
-        }
-        aiDecisionTimer = 0;
-
-        // Encode the current game state
-        const currentState = encodeGameState();
-
-        // If we have a previous state and action, calculate reward and update Q-value
-        if (aiLearning.lastState && aiLearning.lastAction) {
-            // Calculate reward based on game events since last decision
-            let reward = 0;
-
-            // Small negative reward for each time step (encourages efficiency)
-            reward -= 0.1;
-
-            // Check for enemies killed (positive reward)
-            // This is an approximation since we don't track exactly which enemies were killed
-            // A more accurate implementation would hook into the addScore function
-            const enemiesKilledSinceLastDecision = Math.max(0, score - aiLearning.lastScore);
-            if (enemiesKilledSinceLastDecision > 0) {
-                reward += enemiesKilledSinceLastDecision * 10; // Significant positive reward for killing enemies
-            }
-
-            // Check for power-ups collected (positive reward)
-            if (activePowerUp && activePowerUp !== aiLearning.lastPowerUp) {
-                reward += 20; // Significant positive reward for collecting power-ups
-            }
-
-            // Check for lives lost (negative reward)
-            if (lives < aiLearning.lastLives) {
-                reward -= 100; // Large negative reward for losing a life
-            }
-
-            // Update Q-value
-            updateQValue(aiLearning.lastState, aiLearning.lastAction, reward, currentState);
-        }
-
-        // Choose an action based on the current state
-        const action = chooseAction(currentState);
-
-        // Execute the chosen action
-        let shouldMove = false;
-        let moveDirection = null;
-        let shouldFire = false;
-
-        switch (action) {
-            case "fire":
-                shouldFire = true;
-                break;
-            case "moveLeft":
-                shouldMove = true;
-                moveDirection = "left";
-                break;
-            case "moveRight":
-                shouldMove = true;
-                moveDirection = "right";
-                break;
-            case "doNothing":
-                // Do nothing
-                break;
-        }
-
-        // Execute decisions
-        if (shouldFire) {
-            createProjectile(activePowerUp === 'superProjectile');
-        }
-
-        if (shouldMove && currentFrame >= lastLaneChangeFrame + playerLaneChangeRate) {
-            let newLaneIndex = playerCurrentLaneIndex;
-
-            if (moveDirection === 'left') {
-                newLaneIndex = (playerCurrentLaneIndex + 1) % NUM_LANES;
-            } else if (moveDirection === 'right') {
-                newLaneIndex = (playerCurrentLaneIndex - 1 + NUM_LANES) % NUM_LANES;
-            }
-
-            playerCurrentLaneIndex = newLaneIndex;
-            updatePlayerPosition();
-            lastLaneChangeFrame = currentFrame;
-        }
-
-        // Store current state and action for next update
-        aiLearning.lastState = currentState;
-        aiLearning.lastAction = action;
-        aiLearning.lastScore = score;
-        aiLearning.lastLives = lives;
-        aiLearning.lastPowerUp = activePowerUp;
-    }
-
-    // Helper function to decide the best lane to move to
-    function decideBestLaneToMove(enemiesInAdjacentLanes) {
-        // Count enemies in each adjacent lane
-        let leftLaneIndex = (playerCurrentLaneIndex + 1) % NUM_LANES;
-        let rightLaneIndex = (playerCurrentLaneIndex - 1 + NUM_LANES) % NUM_LANES;
-
-        let leftLaneEnemies = enemiesInAdjacentLanes.filter(e => e.enemy.laneIndex === leftLaneIndex);
-        let rightLaneEnemies = enemiesInAdjacentLanes.filter(e => e.enemy.laneIndex === rightLaneIndex);
-
-        // Choose the lane with fewer enemies
-        if (leftLaneEnemies.length < rightLaneEnemies.length) {
-            return 'left';
-        } else if (rightLaneEnemies.length < leftLaneEnemies.length) {
-            return 'right';
-        } else {
-            // If equal, choose randomly
-            return Math.random() < 0.5 ? 'left' : 'right';
-        }
-    }
 
     // Helper function to find the lane index for a given position
     function findLaneForPosition(position) {
