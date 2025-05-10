@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>TEMPESTO</title>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@500;700&display=swap');
         body {
             margin: 0;
             overflow: hidden;
@@ -167,10 +168,6 @@
             /*border-bottom: 1px solid rgba(0, 255, 255, 0.3);*/
         }
 
-        #ui-row:last-child {
-            border-bottom: none;
-        }
-
         #score, #high-score {
             font-size: 1.1em;
             font-weight: bold;
@@ -192,7 +189,7 @@
             border-radius: 4px;
             border: 1px solid rgba(255, 0, 0, 0.3);
             box-shadow: inset 0 0 10px rgba(255, 0, 0, 0.2);
-            letter-spacing: 0px;
+            letter-spacing: 0;
         }
 
         #enemies-remaining {
@@ -203,7 +200,7 @@
             border-radius: 4px;
             border: 1px solid rgba(0, 255, 0, 0.3);
             box-shadow: inset 0 0 10px rgba(0, 255, 0, 0.2);
-            letter-spacing: 0px;
+            letter-spacing: 0;
         }
 
         #power-ups #active-power {
@@ -214,7 +211,7 @@
             border-radius: 4px;
             border: 1px solid rgba(255, 0, 255, 0.3);
             box-shadow: inset 0 0 10px rgba(255, 0, 255, 0.2);
-            letter-spacing: 0px;
+            letter-spacing: 0;
         }
 
         #level-indicator #current-level {
@@ -225,7 +222,7 @@
             border-radius: 4px;
             border: 1px solid rgba(0, 255, 255, 0.3);
             box-shadow: inset 0 0 10px rgba(0, 255, 255, 0.2);
-            letter-spacing: 0px;
+            letter-spacing: 0;
             font-size: 1em;
             font-weight: bold;
             display: inline-block;
@@ -413,8 +410,6 @@
             z-index: 100;
             font-family: 'Orbitron', 'Rajdhani', sans-serif;
         }
-
-        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@500;700&display=swap');
     </style>
 </head>
 <body>
@@ -550,8 +545,6 @@
 
 
     // Mouse tracking variables
-    let mouseX = 0;
-    let mouseY = 0;
     let targetRotationX = 0;
     let targetRotationY = 0;
     let isRotationEnabled = false; // Flag to enable/disable tunnel rotation
@@ -614,14 +607,6 @@
     let bombs = 0; // Start with 3 bombs
     let lastBombMilestone = 0; // Track the last score milestone for bomb rewards
 
-    // Sound effects (placeholders)
-    const sounds = {
-        fire: new Audio(),
-        explode: new Audio(),
-        powerUp: new Audio(),
-        levelComplete: new Audio()
-    };
-
     // --- UI Elements ---
     const uiElement = document.getElementById('ui');
     const scoreUI = document.getElementById('score');
@@ -657,28 +642,6 @@
             localStorage.setItem(STORAGE_KEY_ROTATION_ENABLED, isRotationEnabled);
         } catch (e) {
             console.error("Failed to save rotation state to localStorage:", e);
-        }
-    }
-
-    function loadRotationState() {
-        try {
-            const savedRotationX = localStorage.getItem(STORAGE_KEY_ROTATION_X);
-            const savedRotationY = localStorage.getItem(STORAGE_KEY_ROTATION_Y);
-            const savedRotationEnabled = localStorage.getItem(STORAGE_KEY_ROTATION_ENABLED);
-
-            if (savedRotationX !== null) {
-                targetRotationX = parseFloat(savedRotationX);
-            }
-
-            if (savedRotationY !== null) {
-                targetRotationY = parseFloat(savedRotationY);
-            }
-
-            if (savedRotationEnabled !== null) {
-                isRotationEnabled = savedRotationEnabled === 'true';
-            }
-        } catch (e) {
-            console.error("Failed to load rotation state from localStorage:", e);
         }
     }
 
@@ -2298,36 +2261,6 @@
         // Save rotation state before completing the level
         saveRotationState();
 
-        // If in auto mode, automatically proceed to next level after a short delay
-        if (isAIAutoMode) {
-            // Update AI learning for level completion
-            if (isAIEnabled && aiLearning.lastState && aiLearning.lastAction) {
-                // Large positive reward for completing a level
-                const levelCompletionReward = 200 + (level * 50); // Increases with level
-                updateQValue(aiLearning.lastState, aiLearning.lastAction, levelCompletionReward, null);
-
-                // Reset last state and action for next level
-                aiLearning.lastState = null;
-                aiLearning.lastAction = null;
-
-                // Save AI learning data
-                saveAILearningData();
-            }
-
-            // Proceed to next level after a short delay
-            setTimeout(nextLevel, 2000);
-
-            // Show level complete screen briefly
-            gameState = 'levelcomplete';
-            levelScoreUI.textContent = 'LEVEL ' + level + ' SCORE: ' + score;
-            levelHighScoreUI.textContent = 'HIGH SCORE: ' + highScore;
-            levelCompleteScreen.style.display = 'block';
-            return;
-        }
-
-        // Clear AI auto-restart countdown if active and not in auto mode
-        clearAIRestartCountdown();
-
         gameState = 'levelcomplete';
         levelScoreUI.textContent = 'LEVEL ' + level + ' SCORE: ' + score;
         levelHighScoreUI.textContent = 'HIGH SCORE: ' + highScore;
@@ -2461,30 +2394,6 @@
 
 
 
-    // Helper function to find the lane index for a given position
-    function findLaneForPosition(position) {
-        // This is a simplified version that works best for circular webs
-        // For other web types, more complex calculations would be needed
-        let angle = Math.atan2(position.y, position.x);
-        if (angle < 0) angle += Math.PI * 2;
-
-        return Math.floor(angle / LANE_ANGLE_STEP) % NUM_LANES;
-    }
-
-    // --- Web Rotation Update ---
-    function updateWebRotation() {
-        if (webMesh) {
-            // Smoothly interpolate current rotation towards target rotation only if rotation is enabled and game is not over
-            if (isRotationEnabled && gameState !== 'gameover' && gameState !== 'levelcomplete') {
-                webMesh.rotation.y += (targetRotationY - webMesh.rotation.y) * 0.05;
-                webMesh.rotation.x += (targetRotationX - webMesh.rotation.x) * 0.05;
-            }
-
-            // Keep subtle z-rotation for visual effect regardless of rotation enabled state
-            webMesh.rotation.z += 0.0005;
-        }
-    }
-
     // --- Animation Loop ---
     function animate() {
         requestAnimationFrame(animate);
@@ -2554,27 +2463,6 @@
 
     function onKeyUp(event) {
         keyState[event.key] = false;
-    }
-
-    function onMouseMove(event) {
-        // Calculate mouse position relative to the center of the screen
-        mouseX = (event.clientX - window.innerWidth / 2) / (window.innerWidth / 2);
-        mouseY = (event.clientY - window.innerHeight / 2) / (window.innerHeight / 2);
-
-        // Set target rotation based on mouse position only if rotation is enabled and game is not over
-        if (isRotationEnabled && gameState !== 'gameover' && gameState !== 'levelcomplete') {
-            targetRotationY = mouseX * 0.5; // Horizontal movement controls Y rotation
-            targetRotationX = mouseY * 0.3; // Vertical movement controls X rotation
-
-            // Debounced save of rotation state
-            if (saveRotationTimer) {
-                clearTimeout(saveRotationTimer);
-            }
-            saveRotationTimer = setTimeout(() => {
-                saveRotationState();
-                saveRotationTimer = null;
-            }, 500); // Save after 500ms of no movement
-        }
     }
 
     function onMouseClick(event) {
