@@ -136,11 +136,6 @@
             display: flex;
             flex-direction: column;
             gap: 5px;
-            /*background-color: rgba(0, 0, 0, 0.8);*/
-            /*border: 2px solid #00ffff;*/
-            /*border-radius: 8px;*/
-            /*padding: 8px;*/
-            /*box-shadow: 0 0 20px rgba(0, 255, 255, 0.5), inset 0 0 30px rgba(0, 255, 255, 0.2);*/
             position: relative;
             z-index: 200;
         }
@@ -896,9 +891,6 @@
 
     // --- Initialization Function ---
     function init() {
-        // Load saved rotation state
-//        loadRotationState();
-
         // Load high score
         loadHighScore();
 
@@ -913,7 +905,6 @@
           0.1,
           1000
         );
-//        camera.position.set(0, 8, WEB_DEPTH / 2 + 10);
         camera.position.set(0, .6, WEB_DEPTH / 2 + 15);
         camera.lookAt(0, 0, 0);
 
@@ -966,7 +957,6 @@
         window.addEventListener('resize', onWindowResize);
         window.addEventListener('keydown', onKeyDown);
         window.addEventListener('keyup', onKeyUp);
-        //window.addEventListener('mousemove', onMouseMove);
         window.addEventListener('click', onMouseClick);
 
         // Button listeners
@@ -1674,44 +1664,9 @@
         let x, y;
         let angle;
 
-        if (webType === 'square') {
-            switch (laneIndex) {
-                case 0: // Top
-                    x = 0;
-                    y = WEB_RADIUS * 1.5;
-                    break;
-                case 1: // Left
-                    x = -WEB_RADIUS * 1.5;
-                    y = 0;
-                    break;
-                case 2: // Bottom
-                    x = 0;
-                    y = -WEB_RADIUS * 1.5;
-                    break;
-                case 3: // Right
-                    x = WEB_RADIUS * 1.5;
-                    y = 0;
-                    break;
-            }
-            angle = (laneIndex * (Math.PI * 2) / NUM_LANES);
-        } else if (webType === 'triangle') {
-            const size = WEB_RADIUS * 1.8;
-            if (laneIndex === 0) {
-                x = 0;
-                y = size;
-            } else if (laneIndex === 1) {
-                x = -size;
-                y = -size / 2;
-            } else {
-                x = size;
-                y = -size / 2;
-            }
-            angle = (laneIndex * (Math.PI * 2) / NUM_LANES);
-        } else {
-            angle = laneIndex * LANE_ANGLE_STEP;
-            x = WEB_RADIUS * Math.cos(angle);
-            y = WEB_RADIUS * Math.sin(angle);
-        }
+        angle = laneIndex * LANE_ANGLE_STEP;
+        x = WEB_RADIUS * Math.cos(angle);
+        y = WEB_RADIUS * Math.sin(angle);
 
         // Create a position vector
         const position = new THREE.Vector3(x, y, ENEMY_START_Z);
