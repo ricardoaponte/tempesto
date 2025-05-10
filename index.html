@@ -572,7 +572,7 @@
 
     // Web Configuration
     let NUM_LANES = 16;
-    const WEB_DEPTH = 80;
+    const WEB_DEPTH = 60;
     const WEB_RADIUS = 8;
     let LANE_ANGLE_STEP = (Math.PI * 2) / NUM_LANES;
     let webType = 'circle';
@@ -1203,54 +1203,132 @@
         // Remove existing player if any
         if (player) {
             scene.remove(player);
+            // Proper disposal (optional for this example, but good practice)
+            player.traverse(child => {
+                if (child.isMesh) {
+                    child.geometry.dispose();
+                    if (Array.isArray(child.material)) {
+                        child.material.forEach(material => material.dispose());
+                    } else {
+                        child.material.dispose();
+                    }
+                }
+            });
         }
 
-        // Create a group to hold player elements
         player = new THREE.Group();
 
-        // Main body (box)
-        const bodyGeometry = new THREE.BoxGeometry(1.2, 1.2, 1.2);
-        const bodyMaterial = new THREE.MeshPhongMaterial({
-            color: 0xff0000,
-            emissive: 0x440000,
-            shininess: 30,
-            transparent: true,
-            opacity: 0.9
-        });
-        const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
-        player.add(body);
+        const shipBlue = 0x0055ff; // Classic player blue
+        const shipRed = 0xff0000;   // Accent red
+        const shipYellow = 0xffff00; // Accent yellow
 
-        // Add wings to make it look more like a spaceship
-        const wingGeometry = new THREE.ConeGeometry(0.4, 1, 4);
-        const wingMaterial = new THREE.MeshPhongMaterial({
-            color: 0xffaa00,
-            emissive: 0x441100,
-            shininess: 20
-        });
+        const materialOptions = {
+            shininess: 10, // Low shininess for a less glossy, more plastic/painted look
+            flatShading: true // Crucial for the retro, low-poly aesthetic
+        };
 
-        const leftWing = new THREE.Mesh(wingGeometry, wingMaterial);
-        leftWing.position.set(-0.8, 0, 0);
-        leftWing.rotation.z = Math.PI / 2;
-        player.add(leftWing);
+        // --- Main Body ---
+        // A slightly wedge-shaped or trapezoidal body is common
+        const bodyShape = new THREE.Shape();
+        const bodyWidth = 0.8;
+        const bodyDepthFront = 0.4;
+        const bodyDepthBack = 0.7;
+        const bodyLength = 1.0;
 
-        const rightWing = new THREE.Mesh(wingGeometry, wingMaterial);
-        rightWing.position.set(0.8, 0, 0);
-        rightWing.rotation.z = -Math.PI / 2;
-        player.add(rightWing);
+        bodyShape.moveTo(-bodyWidth / 2, -bodyLength / 2 + bodyDepthFront); // Back-left
+        bodyShape.lineTo(bodyWidth / 2, -bodyLength / 2 + bodyDepthFront);  // Back-right
+        bodyShape.lineTo(bodyWidth / 2, bodyLength / 2 - bodyDepthBack);   // Front-right (tapered)
+        bodyShape.lineTo(-bodyWidth / 2, bodyLength / 2 - bodyDepthBack);  // Front-left (tapered)
+        bodyShape.closePath();
 
-        // Add thruster effect (simple cone)
-        const thrusterGeometry = new THREE.ConeGeometry(0.3, 0.6, 8);
+        const extrudeSettings = {
+            steps: 1,
+            depth: 0.3, // Thickness of the body
+            bevelEnabled: false,
+        };
+        const bodyGeometry = new THREE.ExtrudeGeometry(bodyShape, extrudeSettings);
+        const bodyMaterial = new THREE.MeshPhongMaterial({ color: shipBlue, ...materialOptions });
+        const mainBody = new THREE.Mesh(bodyGeometry, bodyMaterial);
+        mainBody.rotation.x = Math.PI / 2; // Lay it flat
+        mainBody.position.z = -0.15; // Adjust position to align with prongs
+        player.add(mainBody);
+
+
+        // --- "Prongs" / "Cannons" (the iconic forward parts) ---
+        const prongLength = 1.0;
+        const prongWidth = 0.25;
+        const prongHeight = 0.25;
+
+        const prongGeometry = new THREE.BoxGeometry(prongWidth, prongHeight, prongLength);
+        const prongMaterial = new THREE.MeshPhongMaterial({ color: shipBlue, ...materialOptions });
+
+        // Left Prong
+        const leftProng = new THREE.Mesh(prongGeometry, prongMaterial);
+        leftProng.position.set(-0.35, 0, 0.2); // Position to the side and slightly forward of body center
+        player.add(leftProng);
+
+        // Right Prong
+        const rightProng = new THREE.Mesh(prongGeometry, prongMaterial);
+        rightProng.position.set(0.35, 0, 0.2); // Position to the side and slightly forward of body center
+        player.add(rightProng);
+
+        // Prong Tips (Red accents)
+        const tipGeometry = new THREE.BoxGeometry(prongWidth, prongHeight, 0.2);
+        const tipMaterial = new THREE.MeshPhongMaterial({ color: shipRed, ...materialOptions });
+
+        const leftTip = new THREE.Mesh(tipGeometry, tipMaterial);
+        leftTip.position.set(0, 0, prongLength / 2 + 0.1); // At the front of the prong
+        leftProng.add(leftTip); // Add as child of prong for easier positioning
+
+        const rightTip = new THREE.Mesh(tipGeometry, tipMaterial);
+        rightTip.position.set(0, 0, prongLength / 2 + 0.1); // At the front of the prong
+        rightProng.add(rightTip); // Add as child of prong
+
+
+        // --- Cockpit ---
+        // A simple, slightly raised block
+        const cockpitWidth = 0.3;
+        const cockpitHeight = 0.2;
+        const cockpitDepth = 0.25;
+        const cockpitGeometry = new THREE.BoxGeometry(cockpitWidth, cockpitHeight, cockpitDepth);
+        const cockpitMaterial = new THREE.MeshPhongMaterial({ color: shipYellow, ...materialOptions, emissive:0x333300 });
+        const cockpit = new THREE.Mesh(cockpitGeometry, cockpitMaterial);
+        cockpit.position.set(0, extrudeSettings.depth / 2 + cockpitHeight / 2 -0.05, -0.3); // On top of the body, slightly back
+        player.add(cockpit);
+
+
+        // --- Thruster ---
+        // Simple cone, often red or orange
+        const thrusterRadius = 0.2;
+        const thrusterHeight = 0.4;
+        const thrusterGeometry = new THREE.ConeGeometry(thrusterRadius, thrusterHeight, 8); // 8 segments for blockiness
         const thrusterMaterial = new THREE.MeshPhongMaterial({
-            color: 0x00ffff,
-            emissive: 0x00aaff,
-            emissiveIntensity: 0.5,
-            transparent: true,
-            opacity: 0.8
+            color: shipRed,
+            emissive: 0xcc3300, // Make it glow a bit
+            emissiveIntensity: 0.7,
+            ...materialOptions
         });
         const thruster = new THREE.Mesh(thrusterGeometry, thrusterMaterial);
-        thruster.position.set(0, 0, 0.9);
-        thruster.rotation.x = Math.PI;
+        // Position at the back of the main body. The mainBody was extruded along Z, then rotated.
+        // Its local "back" is now at its local -Y after rotation, or -Z before rotation and positioning.
+        // Let's place it relative to the player group's origin.
+        thruster.position.set(0, 0, -bodyLength / 2 - extrudeSettings.depth / 2 - thrusterHeight / 2 + 0.1 );
+        thruster.rotation.x = Math.PI / 2; // Pointing backwards along negative Z local to player group
         player.add(thruster);
+
+
+        // --- Player Orientation ---
+        // Ships typically "face up" on the screen.
+        // If your game's "forward" is along -Z (common), you might want to rotate the ship.
+        // player.rotation.y = Math.PI; // To face -Z if designed pointing +Z
+
+        // If you want it to look like it's flying "into" the screen (like Space Harrier)
+        // this default orientation (prongs along +Z) is fine.
+
+        // For a top-down view, you'd typically orient your camera above.
+        // And the ship might be rotated to "face" the top of the screen.
+        // player.rotation.x = -Math.PI / 2; // If Z is forward, this makes Y "up" for the ship
+        // player.rotation.z = Math.PI; // If you want the cockpit at the "top"
 
         scene.add(player);
     }
