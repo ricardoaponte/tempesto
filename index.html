@@ -5,13 +5,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Enhanced Tempest 80s Clone (Three.js)</title>
     <style>
-        body { margin: 0; overflow: hidden; background-color: #000; color: #00ff00; font-family: 'Press Start 2P', cursive; }
-        canvas { display: block; }
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000;
+            color: #00ff00;
+            font-family: 'Press Start 2P', cursive;
+        }
+
+        canvas {
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: -1;
+        }
 
         /* Shared styles for UI and Menu */
         #ui, #game-over, #menu, #level-complete {
             position: absolute;
-            z-index: 100;
+            /*z-index: 100;*/
             pointer-events: none;
             text-shadow: 0 0 5px;
             font-size: 1em;
@@ -21,26 +34,26 @@
             bottom: 0;
             left: 50%;
             transform: translateX(-50%);
-            width: 60%;
-            max-width: 600px;
+            width: 90%;
+            /*max-width: 600px;*/
             color: #00ff00;
             text-shadow: 0 0 5px #00ff00;
             display: flex;
             flex-direction: column;
             gap: 5px;
-            background-color: rgba(0, 0, 0, 0.8);
-            border: 2px solid #00ffff;
-            border-radius: 8px;
-            padding: 8px;
-            box-shadow: 0 0 20px rgba(0, 255, 255, 0.5), inset 0 0 30px rgba(0, 255, 255, 0.2);
+            /*background-color: rgba(0, 0, 0, 0.8);*/
+            /*border: 2px solid #00ffff;*/
+            /*border-radius: 8px;*/
+            /*padding: 8px;*/
+            /*box-shadow: 0 0 20px rgba(0, 255, 255, 0.5), inset 0 0 30px rgba(0, 255, 255, 0.2);*/
             position: relative;
             z-index: 200;
         }
 
         #ui:before {
-            content: "TEMPEST";
+            content: "TEMPESTO";
             position: absolute;
-            top: -12px;
+            top: 10px;
             left: 50%;
             transform: translateX(-50%);
             background-color: #000;
@@ -52,12 +65,12 @@
             letter-spacing: 1px;
         }
 
-        #ui-row {
+        .ui-row {
             display: flex;
             justify-content: space-between;
             gap: 10px;
             padding: 3px 0;
-            border-bottom: 1px solid rgba(0, 255, 255, 0.3);
+            /*border-bottom: 1px solid rgba(0, 255, 255, 0.3);*/
         }
 
         #ui-row:last-child {
@@ -143,8 +156,14 @@
             text-shadow: 0 0 10px #00ffff;
         }
 
-        #game-over h1, #level-complete h1 { margin: 0 0 15px 0; font-size: 2.5em;}
-        #game-over #final-score, #level-complete #level-score { margin-bottom: 20px; }
+        #game-over h1, #level-complete h1 {
+            margin: 0 0 15px 0;
+            font-size: 2.5em;
+        }
+
+        #game-over #final-score, #level-complete #level-score {
+            margin-bottom: 20px;
+        }
 
         #menu {
             top: 50%;
@@ -161,9 +180,25 @@
             width: 400px;
             box-sizing: border-box;
         }
-        #menu h1 { margin: 0 0 20px 0; font-size: 1.8em; text-shadow: 0 0 10px #ffff00; }
-        #menu div { margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;}
-        #menu label { margin-right: 10px; white-space: nowrap;}
+
+        #menu h1 {
+            margin: 0 0 20px 0;
+            font-size: 1.8em;
+            text-shadow: 0 0 10px #ffff00;
+        }
+
+        #menu div {
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        #menu label {
+            margin-right: 10px;
+            white-space: nowrap;
+        }
+
         #menu select, #menu button, #game-over button, #level-complete button {
             padding: 8px 15px;
             cursor: pointer;
@@ -179,6 +214,7 @@
             border-radius: 0;
             min-width: 100px;
         }
+
         #menu select option {
             background-color: #000;
             color: #ffff00;
@@ -188,6 +224,7 @@
             width: 100%;
             margin-top: 10px;
         }
+
         #menu button:hover, #game-over button:hover, #level-complete button:hover {
             text-shadow: 0 0 15px #ffff00;
             box-shadow: 0 0 10px #ffff00;
@@ -236,32 +273,12 @@
     </style>
 </head>
 <body>
-<div id="ui">
-    <div id="ui-row">
-        <div id="score">SCORE: 0</div>
-        <div id="high-score">HIGH SCORE: 0</div>
-    </div>
-    <div id="ui-row">
-        <div id="lives">LIVES: 3</div>
-        <div id="enemies-remaining">ENEMIES: 0/0</div>
-    </div>
-    <div id="ui-row">
-        <div id="bombs">BOMBS: 3</div>
-        <div id="power-ups">
-            <div id="active-power">POWER: NONE</div>
-        </div>
-    </div>
-    <div id="ui-row">
-        <div id="level-indicator">
-            <div id="current-level">LEVEL: 1</div>
-        </div>
-    </div>
-</div>
 
 <div id="pause-screen">PAUSED</div>
 
 <div id="instructions">
-    ARROWS: MOVE | SPACE: FIRE | B: BOMB | P/ENTER: PAUSE | MOUSE: ROTATE TUNNEL | CLICK: TOGGLE ROTATION | AI: AUTO PLAY | AUTO MODE: CONTINUOUS LEARNING
+    ARROWS: MOVE | SPACE: FIRE | B: BOMB | P/ENTER: PAUSE | MOUSE: ROTATE TUNNEL | CLICK: TOGGLE ROTATION | AI: AUTO
+    PLAY | AUTO MODE: CONTINUOUS LEARNING
 </div>
 
 <div id="game-over">
@@ -341,8 +358,10 @@
             <option value="auto">AUTO</option>
         </select>
     </div>
-    <div id="ai-learning-options" style="display: none; flex-direction: column; align-items: stretch; margin-top: 10px;">
-        <div id="ai-auto-mode-indicator" style="text-align: center; margin-bottom: 10px; color: #ff0000; display: none;">
+    <div id="ai-learning-options"
+         style="display: none; flex-direction: column; align-items: stretch; margin-top: 10px;">
+        <div id="ai-auto-mode-indicator"
+             style="text-align: center; margin-bottom: 10px; color: #ff0000; display: none;">
             AUTO MODE: AI WILL PLAY CONTINUOUSLY
         </div>
         <div style="text-align: left; margin-bottom: 5px;">
@@ -370,6 +389,28 @@
         <button id="ai-reset-button" style="margin-top: 5px;">RESET AI LEARNING</button>
     </div>
     <button id="start-button">START GAME</button>
+</div>
+
+<div id="ui" style="display: none">
+    <div class="ui-row">
+        <div id="score">SCORE: 0</div>
+        <div id="high-score">HIGH SCORE: 0</div>
+    </div>
+    <div class="ui-row">
+        <div id="lives">LIVES: 3</div>
+        <div id="enemies-remaining">ENEMIES: 0/0</div>
+    </div>
+    <div class="ui-row">
+        <div id="bombs">BOMBS: 3</div>
+        <div id="power-ups">
+            <div id="active-power">POWER: NONE</div>
+        </div>
+    </div>
+    <div class="ui-row" style="align-items: center;">
+        <div id="level-indicator">
+            <div id="current-level">LEVEL: 1</div>
+        </div>
+    </div>
 </div>
 
 <!-- Include Three.js library -->
@@ -599,11 +640,12 @@
           0.1,
           1000
         );
-        camera.position.set(0, 13.6, WEB_DEPTH / 2 + 15);
+//        camera.position.set(0, 8, WEB_DEPTH / 2 + 10);
+        camera.position.set(0, .6, WEB_DEPTH / 2 + 15);
         camera.lookAt(0, 0, 0);
 
         // Renderer setup
-        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer = new THREE.WebGLRenderer({antialias: true});
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
@@ -640,11 +682,11 @@
 
         // AI learning listeners
         aiPlayerSelect.addEventListener('change', toggleAILearningOptions);
-        aiLearningRateSelect.addEventListener('change', function() {
+        aiLearningRateSelect.addEventListener('change', function () {
             aiLearning.learningRate = parseFloat(this.value);
             saveAILearningData();
         });
-        aiExplorationRateSelect.addEventListener('change', function() {
+        aiExplorationRateSelect.addEventListener('change', function () {
             aiLearning.explorationRate = parseFloat(this.value);
             saveAILearningData();
         });
@@ -744,10 +786,10 @@
         for (let i = 0; i < positions.length; i += 6) {
             // Each edge has two vertices (start and end)
             const startPoint = new THREE.Vector3(
-                positions[i], positions[i+1], positions[i+2]
+              positions[i], positions[i + 1], positions[i + 2]
             );
             const endPoint = new THREE.Vector3(
-                positions[i+3], positions[i+4], positions[i+5]
+              positions[i + 3], positions[i + 4], positions[i + 5]
             );
 
             // Create a path for the tube
@@ -755,20 +797,29 @@
 
             // Create tube geometry with radius proportional to web size and selected width
             let tubeRadiusMultiplier;
-            switch(tubeWidth) {
-                case 'wire': tubeRadiusMultiplier = 0.0005; break; // 0.5% of web radius
-                case 'small': tubeRadiusMultiplier = 0.001; break; // 1% of web radius
-                case 'medium': tubeRadiusMultiplier = 0.002; break; // 2% of web radius (default)
-                case 'large': tubeRadiusMultiplier = 0.004; break; // 4% of web radius
-                default: tubeRadiusMultiplier = 0.02; // Default to medium
+            switch (tubeWidth) {
+                case 'wire':
+                    tubeRadiusMultiplier = 0.0005;
+                    break; // 0.5% of web radius
+                case 'small':
+                    tubeRadiusMultiplier = 0.001;
+                    break; // 1% of web radius
+                case 'medium':
+                    tubeRadiusMultiplier = 0.002;
+                    break; // 2% of web radius (default)
+                case 'large':
+                    tubeRadiusMultiplier = 0.004;
+                    break; // 4% of web radius
+                default:
+                    tubeRadiusMultiplier = 0.02; // Default to medium
             }
             const tubeRadius = WEB_RADIUS * tubeRadiusMultiplier;
             const tubeGeometry = new THREE.TubeGeometry(
-                path,
-                1,              // tubularSegments
-                tubeRadius,     // radius
-                8,              // radialSegments
-                false           // closed
+              path,
+              1,              // tubularSegments
+              tubeRadius,     // radius
+              8,              // radialSegments
+              false           // closed
             );
 
             // Create material with glow effect
@@ -824,8 +875,8 @@
         const shape = new THREE.Shape();
         const size = WEB_RADIUS * 1.8;
         shape.moveTo(0, size);
-        shape.lineTo(-size, -size/2);
-        shape.lineTo(size, -size/2);
+        shape.lineTo(-size, -size / 2);
+        shape.lineTo(size, -size / 2);
         shape.lineTo(0, size);
         return shape;
     }
@@ -915,8 +966,7 @@
             }
             // Rotation to face inward
             angle = (playerCurrentLaneIndex * Math.PI / 2) + Math.PI / 2;
-        }
-        else if (webType === 'triangle') {
+        } else if (webType === 'triangle') {
             // For triangle web, position at the three corners
             angle = (playerCurrentLaneIndex * Math.PI * 2 / 3);
             const size = WEB_RADIUS * 1.8;
@@ -925,13 +975,12 @@
                 y = size;
             } else if (playerCurrentLaneIndex === 1) {
                 x = -size;
-                y = -size/2;
+                y = -size / 2;
             } else {
                 x = size;
-                y = -size/2;
+                y = -size / 2;
             }
-        }
-        else {
+        } else {
             // For circle or random polygon
             angle = playerCurrentLaneIndex * LANE_ANGLE_STEP;
             x = WEB_RADIUS * Math.cos(angle);
@@ -946,9 +995,9 @@
             // Create a rotation matrix from the web's rotation
             const rotationMatrix = new THREE.Matrix4();
             rotationMatrix.makeRotationFromEuler(new THREE.Euler(
-                webMesh.rotation.x,
-                webMesh.rotation.y,
-                0 // Don't apply z rotation as it's just for visual effect
+              webMesh.rotation.x,
+              webMesh.rotation.y,
+              0 // Don't apply z rotation as it's just for visual effect
             ));
 
             // Apply rotation to position
@@ -974,15 +1023,22 @@
     // --- Set Game Settings ---
     function setGameSettings(speed, difficulty, web, width, lives, ai) {
         // Player Speed
-        switch(speed) {
-            case 'slow': playerLaneChangeRate = 10; break;
-            case 'normal': playerLaneChangeRate = 6; break;
-            case 'fast': playerLaneChangeRate = 3; break;
-            default: playerLaneChangeRate = 6;
+        switch (speed) {
+            case 'slow':
+                playerLaneChangeRate = 10;
+                break;
+            case 'normal':
+                playerLaneChangeRate = 6;
+                break;
+            case 'fast':
+                playerLaneChangeRate = 3;
+                break;
+            default:
+                playerLaneChangeRate = 6;
         }
 
         // Difficulty
-        switch(difficulty) {
+        switch (difficulty) {
             case 'easy':
                 currentEnemySpeed = 0.03;
                 currentEnemySpawnInterval = 80;
@@ -1232,9 +1288,9 @@
             // Create a rotation matrix from the web's rotation
             const rotationMatrix = new THREE.Matrix4();
             rotationMatrix.makeRotationFromEuler(new THREE.Euler(
-                webMesh.rotation.x,
-                webMesh.rotation.y,
-                0 // Don't apply z rotation as it's just for visual effect
+              webMesh.rotation.x,
+              webMesh.rotation.y,
+              0 // Don't apply z rotation as it's just for visual effect
             ));
 
             // Apply rotation to direction
@@ -1302,22 +1358,20 @@
                     break;
             }
             angle = (laneIndex * (Math.PI * 2) / NUM_LANES);
-        }
-        else if (webType === 'triangle') {
+        } else if (webType === 'triangle') {
             const size = WEB_RADIUS * 1.8;
             if (laneIndex === 0) {
                 x = 0;
                 y = size;
             } else if (laneIndex === 1) {
                 x = -size;
-                y = -size/2;
+                y = -size / 2;
             } else {
                 x = size;
-                y = -size/2;
+                y = -size / 2;
             }
             angle = (laneIndex * (Math.PI * 2) / NUM_LANES);
-        }
-        else {
+        } else {
             angle = laneIndex * LANE_ANGLE_STEP;
             x = WEB_RADIUS * Math.cos(angle);
             y = WEB_RADIUS * Math.sin(angle);
@@ -1331,9 +1385,9 @@
             // Create a rotation matrix from the web's rotation
             const rotationMatrix = new THREE.Matrix4();
             rotationMatrix.makeRotationFromEuler(new THREE.Euler(
-                webMesh.rotation.x,
-                webMesh.rotation.y,
-                0 // Don't apply z rotation as it's just for visual effect
+              webMesh.rotation.x,
+              webMesh.rotation.y,
+              0 // Don't apply z rotation as it's just for visual effect
             ));
 
             // Apply rotation to position
@@ -1367,9 +1421,9 @@
             // Create a rotation matrix from the web's rotation
             const rotationMatrix = new THREE.Matrix4();
             rotationMatrix.makeRotationFromEuler(new THREE.Euler(
-                webMesh.rotation.x,
-                webMesh.rotation.y,
-                0 // Don't apply z rotation as it's just for visual effect
+              webMesh.rotation.x,
+              webMesh.rotation.y,
+              0 // Don't apply z rotation as it's just for visual effect
             ));
 
             // Apply rotation to direction
@@ -1391,12 +1445,21 @@
 
         // Color based on power-up type
         let powerColor;
-        switch(powerType) {
-            case 'rapidFire': powerColor = 0xffaa00; break; // Orange
-            case 'extraLife': powerColor = 0xff0000; break; // Red
-            case 'shield': powerColor = 0x0088ff; break; // Blue
-            case 'superProjectile': powerColor = 0xff00ff; break; // Magenta
-            default: powerColor = 0xffffff; // White
+        switch (powerType) {
+            case 'rapidFire':
+                powerColor = 0xffaa00;
+                break; // Orange
+            case 'extraLife':
+                powerColor = 0xff0000;
+                break; // Red
+            case 'shield':
+                powerColor = 0x0088ff;
+                break; // Blue
+            case 'superProjectile':
+                powerColor = 0xff00ff;
+                break; // Magenta
+            default:
+                powerColor = 0xffffff; // White
         }
 
         const powerMaterial = new THREE.MeshPhongMaterial({
@@ -1429,9 +1492,9 @@
             // Create a rotation matrix from the web's rotation
             const rotationMatrix = new THREE.Matrix4();
             rotationMatrix.makeRotationFromEuler(new THREE.Euler(
-                webMesh.rotation.x,
-                webMesh.rotation.y,
-                0 // Don't apply z rotation as it's just for visual effect
+              webMesh.rotation.x,
+              webMesh.rotation.y,
+              0 // Don't apply z rotation as it's just for visual effect
             ));
 
             // Apply rotation to direction
@@ -1510,7 +1573,7 @@
         updatePowerUpUI();
 
         // Apply power-up effect
-        switch(powerType) {
+        switch (powerType) {
             case 'rapidFire':
                 // Rapid fire handled in update loop
                 break;
@@ -2076,11 +2139,18 @@
     function updatePowerUpUI() {
         let powerText = 'POWER: ';
 
-        switch(activePowerUp) {
-            case 'rapidFire': powerText += 'RAPID FIRE'; break;
-            case 'shield': powerText += 'SHIELD'; break;
-            case 'superProjectile': powerText += 'SUPER SHOT'; break;
-            default: powerText += 'NONE';
+        switch (activePowerUp) {
+            case 'rapidFire':
+                powerText += 'RAPID FIRE';
+                break;
+            case 'shield':
+                powerText += 'SHIELD';
+                break;
+            case 'superProjectile':
+                powerText += 'SUPER SHOT';
+                break;
+            default:
+                powerText += 'NONE';
         }
 
         powerUpUI.textContent = powerText;
@@ -2233,8 +2303,8 @@
             }
             // Check if enemy is in adjacent lanes
             else if (
-                enemy.laneIndex === (playerCurrentLaneIndex + 1) % NUM_LANES ||
-                enemy.laneIndex === (playerCurrentLaneIndex - 1 + NUM_LANES) % NUM_LANES
+              enemy.laneIndex === (playerCurrentLaneIndex + 1) % NUM_LANES ||
+              enemy.laneIndex === (playerCurrentLaneIndex - 1 + NUM_LANES) % NUM_LANES
             ) {
                 enemiesInAdjacentLanes.push({
                     enemy: enemy,
@@ -2266,9 +2336,9 @@
         // Enemies in adjacent lanes: none, left, right, both
         let enemiesAdjacent = "none";
         let leftEnemies = enemiesInAdjacentLanes.filter(e =>
-            e.enemy.laneIndex === (playerCurrentLaneIndex + 1) % NUM_LANES);
+          e.enemy.laneIndex === (playerCurrentLaneIndex + 1) % NUM_LANES);
         let rightEnemies = enemiesInAdjacentLanes.filter(e =>
-            e.enemy.laneIndex === (playerCurrentLaneIndex - 1 + NUM_LANES) % NUM_LANES);
+          e.enemy.laneIndex === (playerCurrentLaneIndex - 1 + NUM_LANES) % NUM_LANES);
 
         if (leftEnemies.length > 0 && rightEnemies.length > 0) enemiesAdjacent = "both";
         else if (leftEnemies.length > 0) enemiesAdjacent = "left";
@@ -2317,7 +2387,7 @@
 
         // Q-learning update formula: Q(s,a) = Q(s,a) + α * [r + γ * max Q(s',a') - Q(s,a)]
         const newQ = currentQ + aiLearning.learningRate * (
-            reward + aiLearning.discountFactor * maxNextQ - currentQ
+          reward + aiLearning.discountFactor * maxNextQ - currentQ
         );
 
         // Update Q-table
