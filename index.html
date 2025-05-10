@@ -353,14 +353,65 @@
         }
 
         /* Instructions */
-        #instructions {
+        #instructions-modal {
             position: absolute;
-            bottom: 10px;
-            width: 100%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.9);
+            border: 2px solid #00ffff;
+            padding: 20px;
             text-align: center;
-            color: rgba(255, 255, 255, 0.7);
-            font-size: 0.6em;
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 0.8em;
+            z-index: 102;
+            display: none;
+            max-width: 90%;
+            width: 500px;
+            box-sizing: border-box;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
+        }
+
+        #instructions-modal h2 {
+            margin-top: 0;
+            color: #00ffff;
+            text-shadow: 0 0 10px #00ffff;
+        }
+
+        #instructions-modal button {
+            padding: 8px 15px;
+            cursor: pointer;
+            background-color: #000;
+            color: #00ffff;
+            border: 2px solid #00ffff;
+            text-shadow: 0 0 5px #00ffff;
+            font-family: 'Orbitron', 'Rajdhani', sans-serif;
+            font-size: 0.8em;
+            margin-top: 15px;
+            width: 100%;
+        }
+
+        #instructions-modal button:hover {
+            text-shadow: 0 0 15px #00ffff;
+            box-shadow: 0 0 10px #00ffff;
+        }
+
+        #instructions-button {
+            position: fixed;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(0, 255, 255, 0.2);
+            border: 2px solid rgba(0, 255, 255, 0.5);
+            color: #00ffff;
+            text-shadow: 0 0 5px #00ffff;
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            cursor: pointer;
             z-index: 100;
+            font-family: 'Orbitron', 'Rajdhani', sans-serif;
         }
 
         @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@500;700&display=swap');
@@ -370,10 +421,15 @@
 
 <div id="pause-screen">PAUSED</div>
 
-<div id="instructions">
-    ARROWS: MOVE | SPACE: FIRE | B: BOMB | P/ENTER: PAUSE | MOUSE: ROTATE TUNNEL | CLICK: TOGGLE ROTATION | AI: AUTO
-    PLAY | AUTO MODE: CONTINUOUS LEARNING
+<div id="instructions-modal">
+    <h2>INSTRUCTIONS</h2>
+    <p>ARROWS: MOVE | SPACE: FIRE | B: BOMB | P/ENTER: PAUSE</p>
+    <p>MOUSE: ROTATE TUNNEL | CLICK: TOGGLE ROTATION</p>
+    <p>AI: AUTO PLAY | AUTO MODE: CONTINUOUS LEARNING</p>
+    <button id="close-instructions-button">CLOSE</button>
 </div>
+
+<div id="instructions-button">INSTRUCTIONS</div>
 <!-- Mobile touch controls -->
 <div id="mobile-controls">
     <div style="display: flex; justify-content: space-between; width: 100%">
@@ -741,12 +797,28 @@
         if (isMobile && mobileControls) {
             mobileControls.style.display = 'flex';
 
-            // Update instructions for mobile
-            const instructions = document.getElementById('instructions');
-            if (instructions) {
-                instructions.innerHTML =
-                    'TOUCH: LEFT/RIGHT TO MOVE | SWIPE: LEFT/RIGHT TO MOVE | FIRE BUTTON: SHOOT | BOMB BUTTON: BOMB | ' +
-                    'PAUSE BUTTON: PAUSE | ROTATE BUTTON: TOGGLE ROTATION | DRAG: ROTATE TUNNEL';
+            // Update instructions modal for mobile
+            const instructionsModal = document.getElementById('instructions-modal');
+            if (instructionsModal) {
+                // Update the content of the instructions modal for mobile
+                instructionsModal.innerHTML = `
+                    <h2>INSTRUCTIONS</h2>
+                    <p>TOUCH: LEFT BUTTON MOVES RIGHT, RIGHT BUTTON MOVES LEFT</p>
+                    <p>SWIPE: LEFT TO MOVE RIGHT, RIGHT TO MOVE LEFT</p>
+                    <p>FIRE BUTTON: SHOOT | BOMB BUTTON: BOMB</p>
+                    <p>PAUSE BUTTON: PAUSE | ROTATE BUTTON: TOGGLE ROTATION</p>
+                    <p>DRAG: ROTATE TUNNEL</p>
+                    <button id="close-instructions-button">CLOSE</button>
+                `;
+
+                // Re-add event listener for close button
+                const closeInstructionsButton = document.getElementById('close-instructions-button');
+                if (closeInstructionsButton) {
+                    closeInstructionsButton.addEventListener('click', function() {
+                        instructionsModal.style.display = 'none';
+                        isPaused = false;
+                    });
+                }
             }
 
             // Get control buttons
@@ -763,24 +835,24 @@
             if (leftButton) {
                 leftButton.addEventListener('touchstart', function(e) {
                     e.preventDefault();
-                    keyState['ArrowLeft'] = true;
+                    keyState['ArrowRight'] = true;
                 });
 
                 leftButton.addEventListener('touchend', function(e) {
                     e.preventDefault();
-                    keyState['ArrowLeft'] = false;
+                    keyState['ArrowRight'] = false;
                 });
             }
 
             if (rightButton) {
                 rightButton.addEventListener('touchstart', function(e) {
                     e.preventDefault();
-                    keyState['ArrowRight'] = true;
+                    keyState['ArrowLeft'] = true;
                 });
 
                 rightButton.addEventListener('touchend', function(e) {
                     e.preventDefault();
-                    keyState['ArrowRight'] = false;
+                    keyState['ArrowLeft'] = false;
                 });
             }
 
@@ -815,13 +887,20 @@
                 pauseButton.addEventListener('touchstart', function(e) {
                     e.preventDefault();
                     if (gameState === 'playing') {
-                        isPaused = !isPaused;
-                        pauseScreen.style.display = isPaused ? 'block' : 'none';
-                        menuElement.style.display = isPaused ? 'block' : 'none';
+                        // Check if instructions modal is visible
+                        const instructionsModal = document.getElementById('instructions-modal');
+                        const isInstructionsVisible = instructionsModal && instructionsModal.style.display === 'block';
 
-                        if (!isPaused) {
-                            // Apply settings when resuming
-                            applyGameSettings();
+                        // Only toggle pause if instructions are not visible
+                        if (!isInstructionsVisible) {
+                            isPaused = !isPaused;
+                            pauseScreen.style.display = isPaused ? 'block' : 'none';
+                            menuElement.style.display = isPaused ? 'block' : 'none';
+
+                            if (!isPaused) {
+                                // Apply settings when resuming
+                                applyGameSettings();
+                            }
                         }
                     }
                 });
@@ -893,13 +972,13 @@
 
                         // Determine swipe direction and trigger movement
                         if (swipeDistance < 0) {
-                            // Swipe left - move left
-                            keyState['ArrowLeft'] = true;
-                            setTimeout(() => { keyState['ArrowLeft'] = false; }, 100);
-                        } else {
-                            // Swipe right - move right
+                            // Swipe left - move right (inverted)
                             keyState['ArrowRight'] = true;
                             setTimeout(() => { keyState['ArrowRight'] = false; }, 100);
+                        } else {
+                            // Swipe right - move left (inverted)
+                            keyState['ArrowLeft'] = true;
+                            setTimeout(() => { keyState['ArrowLeft'] = false; }, 100);
                         }
                     }
 
@@ -983,8 +1062,22 @@
         if (levelCompleteScreen) levelCompleteScreen.style.display = 'none';
         if (menuElement) menuElement.style.display = 'block';
 
-        const instructionsElement = document.getElementById('instructions');
-        if (instructionsElement) instructionsElement.style.display = 'block';
+        const instructionsButton = document.getElementById('instructions-button');
+        const instructionsModal = document.getElementById('instructions-modal');
+        const closeInstructionsButton = document.getElementById('close-instructions-button');
+
+        // Add event listener for instructions button
+        if (instructionsButton && instructionsModal && closeInstructionsButton) {
+            instructionsButton.addEventListener('click', function() {
+                instructionsModal.style.display = 'block';
+                isPaused = true;
+            });
+
+            closeInstructionsButton.addEventListener('click', function() {
+                instructionsModal.style.display = 'none';
+                isPaused = false;
+            });
+        }
 
         // Event Listeners
         window.addEventListener('resize', onWindowResize);
@@ -2961,13 +3054,20 @@
 
         // Toggle pause
         if (gameState === 'playing' && (event.key === 'p' || event.key === 'Enter')) {
-            isPaused = !isPaused;
-            pauseScreen.style.display = isPaused ? 'block' : 'none';
-            menuElement.style.display = isPaused ? 'block' : 'none';
+            // Check if instructions modal is visible
+            const instructionsModal = document.getElementById('instructions-modal');
+            const isInstructionsVisible = instructionsModal && instructionsModal.style.display === 'block';
 
-            if (!isPaused) {
-                // Apply settings when resuming
-                applyGameSettings();
+            // Only toggle pause if instructions are not visible
+            if (!isInstructionsVisible) {
+                isPaused = !isPaused;
+                pauseScreen.style.display = isPaused ? 'block' : 'none';
+                menuElement.style.display = isPaused ? 'block' : 'none';
+
+                if (!isPaused) {
+                    // Apply settings when resuming
+                    applyGameSettings();
+                }
             }
         }
 
