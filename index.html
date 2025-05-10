@@ -14,22 +14,114 @@
             z-index: 100;
             pointer-events: none;
             text-shadow: 0 0 5px;
-            font-size: 1.2em;
+            font-size: 1em;
         }
 
         #ui {
-            top: 10px;
-            left: 10px;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60%;
+            max-width: 600px;
             color: #00ff00;
             text-shadow: 0 0 5px #00ff00;
             display: flex;
             flex-direction: column;
             gap: 5px;
+            background-color: rgba(0, 0, 0, 0.8);
+            border: 2px solid #00ffff;
+            border-radius: 8px;
+            padding: 8px;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.5), inset 0 0 30px rgba(0, 255, 255, 0.2);
+            position: relative;
+            z-index: 200;
+        }
+
+        #ui:before {
+            content: "TEMPEST";
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #000;
+            padding: 0 10px;
+            font-size: 1.2em;
+            color: #ff00ff;
+            text-shadow: 0 0 10px #ff00ff, 0 0 20px #ff00ff;
+            font-weight: bold;
+            letter-spacing: 1px;
         }
 
         #ui-row {
             display: flex;
-            gap: 20px;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 3px 0;
+            border-bottom: 1px solid rgba(0, 255, 255, 0.3);
+        }
+
+        #ui-row:last-child {
+            border-bottom: none;
+        }
+
+        #score, #high-score {
+            font-size: 1.1em;
+            font-weight: bold;
+            color: #ffff00;
+            text-shadow: 0 0 10px #ffff00;
+            padding: 3px 6px;
+            background-color: rgba(255, 255, 0, 0.1);
+            border-radius: 4px;
+            border: 1px solid rgba(255, 255, 0, 0.3);
+            box-shadow: inset 0 0 10px rgba(255, 255, 0, 0.2);
+            letter-spacing: 1px;
+        }
+
+        #lives, #bombs {
+            color: #ff5555;
+            text-shadow: 0 0 8px #ff0000;
+            padding: 3px 6px;
+            background-color: rgba(255, 0, 0, 0.1);
+            border-radius: 4px;
+            border: 1px solid rgba(255, 0, 0, 0.3);
+            box-shadow: inset 0 0 10px rgba(255, 0, 0, 0.2);
+            letter-spacing: 0px;
+        }
+
+        #enemies-remaining {
+            color: #55ff55;
+            text-shadow: 0 0 8px #00ff00;
+            padding: 3px 6px;
+            background-color: rgba(0, 255, 0, 0.1);
+            border-radius: 4px;
+            border: 1px solid rgba(0, 255, 0, 0.3);
+            box-shadow: inset 0 0 10px rgba(0, 255, 0, 0.2);
+            letter-spacing: 0px;
+        }
+
+        #power-ups #active-power {
+            color: #ff00ff;
+            text-shadow: 0 0 8px #ff00ff;
+            padding: 3px 6px;
+            background-color: rgba(255, 0, 255, 0.1);
+            border-radius: 4px;
+            border: 1px solid rgba(255, 0, 255, 0.3);
+            box-shadow: inset 0 0 10px rgba(255, 0, 255, 0.2);
+            letter-spacing: 0px;
+        }
+
+        #level-indicator #current-level {
+            color: #00ffff;
+            text-shadow: 0 0 8px #00ffff;
+            padding: 3px 6px;
+            background-color: rgba(0, 255, 255, 0.1);
+            border-radius: 4px;
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            box-shadow: inset 0 0 10px rgba(0, 255, 255, 0.2);
+            letter-spacing: 0px;
+            font-size: 1em;
+            font-weight: bold;
+            display: inline-block;
         }
 
         #game-over, #level-complete {
@@ -103,20 +195,17 @@
 
         /* Power-up indicator */
         #power-ups {
-            position: absolute;
-            top: 10px;
-            right: 10px;
             color: #ff00ff;
-            text-shadow: 0 0 5px #ff00ff;
+            text-shadow: 0 0 8px #ff00ff;
+            font-weight: bold;
         }
 
         /* Level indicator */
         #level-indicator {
-            position: absolute;
-            top: 50px;
-            left: 10px;
             color: #00ffff;
-            text-shadow: 0 0 5px #00ffff;
+            text-shadow: 0 0 8px #00ffff;
+            font-weight: bold;
+            font-size: 1.2em;
         }
 
         /* Pause screen */
@@ -138,8 +227,8 @@
             bottom: 10px;
             width: 100%;
             text-align: center;
-            color: #ffffff;
-            font-size: 0.8em;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.6em;
             z-index: 100;
         }
 
@@ -156,20 +245,23 @@
         <div id="lives">LIVES: 3</div>
         <div id="enemies-remaining">ENEMIES: 0/0</div>
     </div>
-</div>
-
-<div id="power-ups">
-    <div id="active-power">POWER: NONE</div>
-</div>
-
-<div id="level-indicator">
-    <div id="current-level">LEVEL: 1</div>
+    <div id="ui-row">
+        <div id="bombs">BOMBS: 3</div>
+        <div id="power-ups">
+            <div id="active-power">POWER: NONE</div>
+        </div>
+    </div>
+    <div id="ui-row">
+        <div id="level-indicator">
+            <div id="current-level">LEVEL: 1</div>
+        </div>
+    </div>
 </div>
 
 <div id="pause-screen">PAUSED</div>
 
 <div id="instructions">
-    ARROWS: MOVE | SPACE: FIRE | P/ENTER: PAUSE | MOUSE: ROTATE TUNNEL | CLICK: TOGGLE ROTATION | AI: AUTO PLAY | AUTO MODE: CONTINUOUS LEARNING
+    ARROWS: MOVE | SPACE: FIRE | B: BOMB | P/ENTER: PAUSE | MOUSE: ROTATE TUNNEL | CLICK: TOGGLE ROTATION | AI: AUTO PLAY | AUTO MODE: CONTINUOUS LEARNING
 </div>
 
 <div id="game-over">
@@ -381,6 +473,10 @@
     let powerUpTimer = 0;
     let lastFrameTime = 0;
 
+    // Bomb variables
+    let bombs = 0; // Start with 3 bombs
+    let lastBombMilestone = 0; // Track the last score milestone for bomb rewards
+
     // Sound effects (placeholders)
     const sounds = {
         fire: new Audio(),
@@ -395,6 +491,7 @@
     const highScoreUI = document.getElementById('high-score');
     const livesUI = document.getElementById('lives');
     const enemiesRemainingUI = document.getElementById('enemies-remaining');
+    const bombsUI = document.getElementById('bombs');
     const powerUpUI = document.getElementById('active-power');
     const levelUI = document.getElementById('current-level');
     const pauseScreen = document.getElementById('pause-screen');
@@ -960,6 +1057,8 @@
         lastLaneChangeFrame = 0;
         activePowerUp = null;
         powerUpTimer = 0;
+        bombs = 0; // Reset bombs to 0
+        lastBombMilestone = 0; // Reset last bomb milestone
 
         // Reset AI learning state for new episode
         if (isAIEnabled) {
@@ -993,6 +1092,7 @@
         updateLevelUI();
         updatePowerUpUI();
         updateEnemiesRemainingUI();
+        updateBombsUI();
 
         uiElement.style.display = 'block';
         document.getElementById('power-ups').style.display = 'block';
@@ -1044,6 +1144,7 @@
         // Update UI
         updateLevelUI();
         updateEnemiesRemainingUI();
+        updateBombsUI();
 
         // Hide level complete screen
         levelCompleteScreen.style.display = 'none';
@@ -1904,6 +2005,56 @@
             updateHighScoreUI();
             saveHighScore();
         }
+
+        // Check for bomb reward milestone (every 1000 points)
+        const currentMilestone = Math.floor(score / 1000);
+        if (currentMilestone > lastBombMilestone) {
+            // Award a new bomb for each milestone passed
+            const newBombs = currentMilestone - lastBombMilestone;
+
+            // Add bombs, but don't exceed the maximum of 30000000
+            bombs = Math.min(bombs + newBombs, 3000000);
+
+            // Update the last milestone
+            lastBombMilestone = currentMilestone;
+
+            // Update the bombs UI
+            updateBombsUI();
+
+            // Visual feedback for getting a new bomb
+            const message = newBombs === 1 ? "NEW BOMB ACQUIRED!" : newBombs + " NEW BOMBS ACQUIRED!";
+            showMessage(message, 0xffff00);
+        }
+    }
+
+    // Helper function to show temporary messages
+    function showMessage(text, color) {
+        // Create a div for the message
+        const messageDiv = document.createElement('div');
+        messageDiv.textContent = text;
+        messageDiv.style.position = 'absolute';
+        messageDiv.style.top = '50%';
+        messageDiv.style.left = '50%';
+        messageDiv.style.transform = 'translate(-50%, -50%)';
+        messageDiv.style.color = '#' + color.toString(16);
+        messageDiv.style.textShadow = '0 0 10px #' + color.toString(16);
+        messageDiv.style.fontSize = '2em';
+        messageDiv.style.fontFamily = "'Press Start 2P', cursive";
+        messageDiv.style.zIndex = '1000';
+        messageDiv.style.pointerEvents = 'none';
+
+        // Add to document
+        document.body.appendChild(messageDiv);
+
+        // Fade out and float up after 2 seconds
+        setTimeout(() => {
+            messageDiv.style.transition = 'opacity 1s, transform 1s';
+            messageDiv.style.opacity = '0';
+            messageDiv.style.transform = 'translate(-50%, -150%)'; // Move upward while fading
+            setTimeout(() => {
+                document.body.removeChild(messageDiv);
+            }, 1000);
+        }, 1000);
     }
 
     function updateScoreUI() {
@@ -1938,6 +2089,10 @@
     function updateEnemiesRemainingUI() {
         const remaining = Math.max(0, enemiesRequired - enemiesKilled);
         enemiesRemainingUI.textContent = 'ENEMIES: ' + remaining + '/' + enemiesRequired;
+    }
+
+    function updateBombsUI() {
+        bombsUI.textContent = 'BOMBS: ' + bombs;
     }
 
     // --- AI Learning Functions ---
@@ -2400,6 +2555,11 @@
             createProjectile(activePowerUp === 'superProjectile');
         }
 
+        // Handle bomb activation
+        if (gameState === 'playing' && !isPaused && event.key.toLowerCase() === 'b') {
+            activateBomb();
+        }
+
         // Toggle pause
         if (gameState === 'playing' && (event.key === 'p' || event.key === 'Enter')) {
             isPaused = !isPaused;
@@ -2413,7 +2573,7 @@
         }
 
         // Prevent scrolling when pressing space, arrow keys, or Enter
-        if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter'].includes(event.key)) {
+        if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter', 'b', 'B'].includes(event.key)) {
             event.preventDefault();
         }
     }
@@ -2451,6 +2611,52 @@
 
             // Save rotation state to localStorage
             saveRotationState();
+        }
+    }
+
+    // --- Bomb Activation Function ---
+    function activateBomb() {
+        // Check if there are bombs available
+        if (bombs <= 0) return;
+
+        // Decrease bomb count
+        bombs--;
+        updateBombsUI();
+
+        // Create a large explosion effect at the center of the web
+        const centerExplosion = createExplosion(new THREE.Vector3(0, 0, 0), 0xff0000);
+        centerExplosion.scale.set(3, 3, 3); // Make the explosion larger
+
+        // Track total points from destroyed enemies
+        let totalPoints = 0;
+
+        // Destroy all visible enemies
+        for (let i = enemies.length - 1; i >= 0; i--) {
+            const enemy = enemies[i];
+
+            // Add points for each enemy
+            totalPoints += enemy.points;
+
+            // Create explosion effect at enemy position
+            createExplosion(enemy.position, enemy.isSpecial ? 0xff0000 : 0x00ff00);
+
+            // Remove enemy
+            scene.remove(enemy);
+            enemies.splice(i, 1);
+
+            // Increment enemies killed count
+            enemiesKilled++;
+        }
+
+        // Add score for destroyed enemies
+        if (totalPoints > 0) {
+            addScore(totalPoints);
+            updateEnemiesRemainingUI();
+        }
+
+        // Check if level is complete
+        if (enemiesKilled >= enemiesRequired) {
+            completedLevel();
         }
     }
 
