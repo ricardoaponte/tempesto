@@ -626,8 +626,10 @@
     let saveRotationTimer = null;
 
     // Game State
-    let gameState = 'menu'; // 'menu', 'playing', 'paused', 'gameover', 'levelcomplete'
+    let gameState = 'menu'; // 'menu', 'countdown', 'playing', 'paused', 'gameover', 'levelcomplete'
     let isPaused = false;
+    let countdownTime = 3; // 3 second countdown
+    let countdownStartTime = 0;
 
     // Sound State
     let isSoundEnabled = true; // Default to sound on
@@ -1843,423 +1845,349 @@
 
     // --- Stealth Ship Design ---
     function createStealthShip(materialOptions) {
-        const stealthBlack = 0x222222; // Dark black for stealth
-        const stealthPurple = 0x8800ff; // Purple accent
-        const stealthGreen = 0x00ff88; // Green accent for cockpit
+        const bodyMat = new THREE.MeshPhongMaterial({ color: 0x1A1A2A, ...materialOptions, emissive: 0x330066, emissiveIntensity: 0.4, shininess: 50});
+        const wingMat = new THREE.MeshPhongMaterial({ color: 0x101020, ...materialOptions });
+        const cockpitMat = new THREE.MeshPhongMaterial({ color: 0x7F00FF, emissive: 0x5000A0, emissiveIntensity: 0.8, ...materialOptions });
 
-        // --- Main Body (sleek, angular design) ---
+        // Main body - angular wedge
         const bodyShape = new THREE.Shape();
-        const bodyWidth = 0.7; // Narrower than classic
-        const bodyLength = 1.2; // Longer than classic
-
-        // Create a more angular, arrow-like shape
-        bodyShape.moveTo(0, bodyLength / 2); // Front point
-        bodyShape.lineTo(-bodyWidth / 2, -bodyLength / 2); // Back-left
-        bodyShape.lineTo(bodyWidth / 2, -bodyLength / 2); // Back-right
-        bodyShape.lineTo(0, bodyLength / 2); // Back to front point
-
-        const extrudeSettings = {
-            steps: 1,
-            depth: 0.15, // Thinner than classic
-            bevelEnabled: false,
-        };
-
-        const bodyGeometry = new THREE.ExtrudeGeometry(bodyShape, extrudeSettings);
-        const bodyMaterial = new THREE.MeshPhongMaterial({
-            color: stealthBlack,
-            ...materialOptions,
-            emissive: 0x111111,
-            emissiveIntensity: 0.3
-        });
-
-        const mainBody = new THREE.Mesh(bodyGeometry, bodyMaterial);
-        mainBody.rotation.x = Math.PI / 2; // Lay it flat
+        bodyShape.moveTo(0, 0.8); // Tip
+        bodyShape.lineTo(-0.4, -0.5);
+        bodyShape.lineTo(-0.2, -0.7); // Notch
+        bodyShape.lineTo(0.2, -0.7);  // Notch
+        bodyShape.lineTo(0.4, -0.5);
+        bodyShape.closePath();
+        const extrudeSettings = { depth: 0.15, bevelEnabled: false };
+        const bodyGeo = new THREE.ExtrudeGeometry(bodyShape, extrudeSettings);
+        const mainBody = new THREE.Mesh(bodyGeo, bodyMat);
+        mainBody.rotation.x = Math.PI / 2;
         player.add(mainBody);
 
-        // --- Wings (thin, swept-back) ---
-        const wingGeometry = new THREE.BoxGeometry(1.2, 0.05, 0.6);
-        const wingMaterial = new THREE.MeshPhongMaterial({ color: stealthBlack, ...materialOptions });
+        // Swept wings
+        const wingGeo = new THREE.BoxGeometry(1.8, 0.08, 0.4); // Long, thin
+        const leftWing = new THREE.Mesh(wingGeo, wingMat);
+        leftWing.position.set(-0.7, 0, -0.1);
+        leftWing.rotation.y = Math.PI / 6; // Swept back
+        player.add(leftWing);
+        const rightWing = new THREE.Mesh(wingGeo, wingMat);
+        rightWing.position.set(0.7, 0, -0.1);
+        rightWing.rotation.y = -Math.PI / 6; // Swept back
+        player.add(rightWing);
 
-        const wings = new THREE.Mesh(wingGeometry, wingMaterial);
-        wings.position.set(0, 0, -0.2);
-        wings.rotation.x = Math.PI / 12; // Slight angle
-        player.add(wings);
-
-        // --- Cockpit (small, glowing) ---
-        const cockpitGeometry = new THREE.SphereGeometry(0.15, 8, 8);
-        const cockpitMaterial = new THREE.MeshPhongMaterial({
-            color: stealthGreen,
-            ...materialOptions,
-            emissive: 0x003322,
-            emissiveIntensity: 0.7
-        });
-
-        const cockpit = new THREE.Mesh(cockpitGeometry, cockpitMaterial);
-        cockpit.position.set(0, 0.1, 0.2);
-        cockpit.scale.set(1, 0.5, 1); // Flatten it a bit
+        // Cockpit - small slit
+        const cockpitGeo = new THREE.BoxGeometry(0.2, 0.05, 0.3);
+        const cockpit = new THREE.Mesh(cockpitGeo, cockpitMat);
+        cockpit.position.set(0, 0.12, 0.3);
         player.add(cockpit);
 
-        // --- Engine Glow ---
-        const engineGlowGeometry = new THREE.CircleGeometry(0.2, 8);
-        const engineGlowMaterial = new THREE.MeshBasicMaterial({
-            color: stealthPurple,
-            transparent: true,
-            opacity: 0.7
-        });
-
-        const engineGlow = new THREE.Mesh(engineGlowGeometry, engineGlowMaterial);
-        engineGlow.position.set(0, 0, -0.6);
-        engineGlow.rotation.x = Math.PI / 2;
-        player.add(engineGlow);
+        // Engine glow (subtle)
+        const engineGlowGeo = new THREE.CylinderGeometry(0.1, 0.1, 0.1, 8);
+        const engineGlowMat = new THREE.MeshBasicMaterial({ color: 0xAA00FF, transparent: true, opacity: 0.6 });
+        const engineGlow1 = new THREE.Mesh(engineGlowGeo, engineGlowMat);
+        engineGlow1.position.set(-0.15, 0, -0.65);
+        engineGlow1.rotation.x = Math.PI / 2;
+        player.add(engineGlow1);
+        const engineGlow2 = new THREE.Mesh(engineGlowGeo, engineGlowMat);
+        engineGlow2.position.set(0.15, 0, -0.65);
+        engineGlow2.rotation.x = Math.PI / 2;
+        player.add(engineGlow2);
     }
 
     // --- Destroyer Ship Design ---
     function createDestroyerShip(materialOptions) {
-        const destroyerGray = 0x444444; // Dark gray for main body
-        const destroyerRed = 0xcc0000; // Dark red for accents
-        const destroyerOrange = 0xff6600; // Orange for weapons
+        const bodyMat = new THREE.MeshPhongMaterial({ color: 0x404050, ...materialOptions, metalness: 0.6, roughness: 0.4 });
+        const armorMat = new THREE.MeshPhongMaterial({ color: 0x303040, ...materialOptions });
+        const weaponMat = new THREE.MeshPhongMaterial({ color: 0xFF4500, emissive: 0xDD3000, emissiveIntensity: 0.5, ...materialOptions }); // Orange-Red
 
-        // --- Main Body (bulky, imposing) ---
-        const bodyGeometry = new THREE.BoxGeometry(1.0, 0.4, 1.5);
-        const bodyMaterial = new THREE.MeshPhongMaterial({ color: destroyerGray, ...materialOptions });
-
-        const mainBody = new THREE.Mesh(bodyGeometry, bodyMaterial);
+        // Main Hull - Boxy
+        const bodyGeo = new THREE.BoxGeometry(1.2, 0.5, 1.8);
+        const mainBody = new THREE.Mesh(bodyGeo, bodyMat);
         player.add(mainBody);
 
-        // --- Side Armor Plates ---
-        const armorGeometry = new THREE.BoxGeometry(0.3, 0.5, 1.2);
-        const armorMaterial = new THREE.MeshPhongMaterial({ color: destroyerGray, ...materialOptions });
+        // Side Armor/Weapon Pods
+        const sidePodGeo = new THREE.BoxGeometry(0.4, 0.6, 1.0);
+        const leftPod = new THREE.Mesh(sidePodGeo, armorMat);
+        leftPod.position.set(-0.7, 0, 0.2);
+        player.add(leftPod);
+        const rightPod = new THREE.Mesh(sidePodGeo, armorMat);
+        rightPod.position.set(0.7, 0, 0.2);
+        player.add(rightPod);
 
-        const leftArmor = new THREE.Mesh(armorGeometry, armorMaterial);
-        leftArmor.position.set(-0.6, 0, 0);
-        player.add(leftArmor);
+        // Cannons
+        const cannonGeo = new THREE.CylinderGeometry(0.08, 0.08, 0.6, 8);
+        const cannon1 = new THREE.Mesh(cannonGeo, weaponMat);
+        cannon1.position.set(-0.7, 0.1, 0.8); // On left pod, forward
+        cannon1.rotation.x = Math.PI / 2;
+        player.add(cannon1);
+        const cannon2 = new THREE.Mesh(cannonGeo, weaponMat);
+        cannon2.position.set(0.7, 0.1, 0.8);  // On right pod, forward
+        cannon2.rotation.x = Math.PI / 2;
+        player.add(cannon2);
 
-        const rightArmor = new THREE.Mesh(armorGeometry, armorMaterial);
-        rightArmor.position.set(0.6, 0, 0);
-        player.add(rightArmor);
-
-        // --- Weapon Turrets ---
-        const turretGeometry = new THREE.CylinderGeometry(0.15, 0.15, 0.2, 8);
-        const turretMaterial = new THREE.MeshPhongMaterial({ color: destroyerOrange, ...materialOptions });
-
-        const frontLeftTurret = new THREE.Mesh(turretGeometry, turretMaterial);
-        frontLeftTurret.position.set(-0.4, 0.3, 0.5);
-        player.add(frontLeftTurret);
-
-        const frontRightTurret = new THREE.Mesh(turretGeometry, turretMaterial);
-        frontRightTurret.position.set(0.4, 0.3, 0.5);
-        player.add(frontRightTurret);
-
-        // --- Cannon Barrels ---
-        const barrelGeometry = new THREE.CylinderGeometry(0.05, 0.05, 0.4, 8);
-        const barrelMaterial = new THREE.MeshPhongMaterial({ color: destroyerGray, ...materialOptions });
-
-        const leftBarrel = new THREE.Mesh(barrelGeometry, barrelMaterial);
-        leftBarrel.position.set(0, 0, 0.3);
-        leftBarrel.rotation.x = Math.PI / 2;
-        frontLeftTurret.add(leftBarrel);
-
-        const rightBarrel = new THREE.Mesh(barrelGeometry, barrelMaterial);
-        rightBarrel.position.set(0, 0, 0.3);
-        rightBarrel.rotation.x = Math.PI / 2;
-        frontRightTurret.add(rightBarrel);
-
-        // --- Command Bridge ---
-        const bridgeGeometry = new THREE.BoxGeometry(0.5, 0.2, 0.4);
-        const bridgeMaterial = new THREE.MeshPhongMaterial({
-            color: destroyerRed,
-            ...materialOptions,
-            emissive: 0x330000,
-            emissiveIntensity: 0.5
-        });
-
-        const bridge = new THREE.Mesh(bridgeGeometry, bridgeMaterial);
-        bridge.position.set(0, 0.3, -0.3);
+        // Bridge
+        const bridgeGeo = new THREE.BoxGeometry(0.5, 0.3, 0.4);
+        const bridge = new THREE.Mesh(bridgeGeo, bodyMat); // Use body material
+        bridge.position.set(0, 0.35, -0.2); // On top, slightly back
         player.add(bridge);
 
-        // --- Engine Exhausts ---
-        const exhaustGeometry = new THREE.CylinderGeometry(0.1, 0.15, 0.2, 8);
-        const exhaustMaterial = new THREE.MeshPhongMaterial({
-            color: destroyerRed,
-            ...materialOptions,
-            emissive: 0xff3300,
-            emissiveIntensity: 0.8
-        });
-
-        const leftExhaust = new THREE.Mesh(exhaustGeometry, exhaustMaterial);
-        leftExhaust.position.set(-0.3, -0.1, -0.8);
-        leftExhaust.rotation.x = Math.PI / 2;
-        player.add(leftExhaust);
-
-        const rightExhaust = new THREE.Mesh(exhaustGeometry, exhaustMaterial);
-        rightExhaust.position.set(0.3, -0.1, -0.8);
-        rightExhaust.rotation.x = Math.PI / 2;
-        player.add(rightExhaust);
+        // Engines (large, blocky)
+        const engineGeo = new THREE.BoxGeometry(0.3, 0.3, 0.4);
+        const engineMat = new THREE.MeshPhongMaterial({color: 0xFF8C00, emissive: 0xFF4500, emissiveIntensity: 0.7});
+        const engine1 = new THREE.Mesh(engineGeo, engineMat);
+        engine1.position.set(-0.3, -0.1, -1.0);
+        player.add(engine1);
+        const engine2 = new THREE.Mesh(engineGeo, engineMat);
+        engine2.position.set(0.3, -0.1, -1.0);
+        player.add(engine2);
     }
 
     // --- Racer Ship Design ---
     function createRacerShip(materialOptions) {
-        const racerBlue = 0x00aaff; // Bright blue for main body
-        const racerYellow = 0xffcc00; // Yellow for accents
-        const racerSilver = 0xcccccc; // Silver for details
-
-        // --- Main Body (sleek, aerodynamic) ---
-        const bodyShape = new THREE.Shape();
-        const bodyWidth = 0.6; // Narrow
-        const bodyLength = 1.4; // Long
-
-        // Create a teardrop shape
-        bodyShape.moveTo(0, bodyLength / 2); // Front point
-        bodyShape.bezierCurveTo(
-            bodyWidth / 2, bodyLength / 3, // Control point 1
-            bodyWidth / 2, -bodyLength / 2, // Control point 2
-            0, -bodyLength / 2 // End point (back center)
-        );
-        bodyShape.bezierCurveTo(
-            -bodyWidth / 2, -bodyLength / 2, // Control point 1
-            -bodyWidth / 2, bodyLength / 3, // Control point 2
-            0, bodyLength / 2 // End point (back to front)
-        );
-
-        const extrudeSettings = {
-            steps: 1,
-            depth: 0.2,
-            bevelEnabled: false,
-        };
-
-        const bodyGeometry = new THREE.ExtrudeGeometry(bodyShape, extrudeSettings);
-        const bodyMaterial = new THREE.MeshPhongMaterial({
-            color: racerBlue,
-            ...materialOptions,
-            shininess: 30 // More shiny than other ships
+        const bodyMat = new THREE.MeshStandardMaterial({
+            color: 0x0077FF, // Bright Blue
+            metalness: 0.6,
+            roughness: 0.2, // Shiny
+            flatShading: false // Smooth for racer
         });
-
-        const mainBody = new THREE.Mesh(bodyGeometry, bodyMaterial);
-        mainBody.rotation.x = Math.PI / 2; // Lay it flat
-        player.add(mainBody);
-
-        // --- Racing Stripes ---
-        const stripeGeometry = new THREE.BoxGeometry(0.05, 0.05, 1.2);
-        const stripeMaterial = new THREE.MeshPhongMaterial({
-            color: racerYellow,
-            ...materialOptions,
-            emissive: 0x332200,
-            emissiveIntensity: 0.5
+        const accentMat = new THREE.MeshStandardMaterial({
+            color: 0xFFD700, // Gold/Yellow
+            metalness: 0.8,
+            roughness: 0.3,
+            flatShading: false
         });
-
-        const leftStripe = new THREE.Mesh(stripeGeometry, stripeMaterial);
-        leftStripe.position.set(-0.2, 0.15, 0);
-        player.add(leftStripe);
-
-        const rightStripe = new THREE.Mesh(stripeGeometry, stripeMaterial);
-        rightStripe.position.set(0.2, 0.15, 0);
-        player.add(rightStripe);
-
-        // --- Cockpit (streamlined) ---
-        const cockpitGeometry = new THREE.SphereGeometry(0.15, 16, 8);
-        const cockpitMaterial = new THREE.MeshPhongMaterial({
-            color: racerSilver,
-            ...materialOptions,
+        const cockpitMat = new THREE.MeshStandardMaterial({
+            color: 0x101020, // Dark tinted glass
+            metalness: 0.1,
+            roughness: 0.1,
+            transparent: true,
             opacity: 0.7,
-            transparent: true
+            flatShading: false
+        });
+        const engineGlowMat = new THREE.MeshStandardMaterial({
+            color: 0xFF8C00, // Bright Orange
+            emissive: 0xFF8C00,
+            emissiveIntensity: 3,
+            flatShading: true // Can be faceted for effect
         });
 
-        const cockpit = new THREE.Mesh(cockpitGeometry, cockpitMaterial);
-        cockpit.position.set(0, 0.2, 0.3);
-        cockpit.scale.set(1, 0.4, 1.5); // Flatten and stretch
+        // Main Fuselage (long and sleek)
+        const fuselageGeo = new THREE.CylinderGeometry(0.2, 0.35, 2.5, 16); // Narrow front, wider back, long
+        const fuselage = new THREE.Mesh(fuselageGeo, bodyMat);
+        fuselage.rotation.x = Math.PI / 2;
+        player.add(fuselage);
+
+        // Cockpit (bubble canopy)
+        const cockpitGeo = new THREE.SphereGeometry(0.25, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2); // Half sphere
+        const cockpit = new THREE.Mesh(cockpitGeo, cockpitMat);
+        cockpit.position.set(0, 0.15, 0.6); // Forward on fuselage
+        cockpit.scale.z = 1.5; // Stretch it back
         player.add(cockpit);
 
-        // --- Fins ---
-        const finGeometry = new THREE.BoxGeometry(0.05, 0.3, 0.4);
-        const finMaterial = new THREE.MeshPhongMaterial({ color: racerBlue, ...materialOptions });
+        // Side Intakes / Wings
+        const intakeShape = new THREE.Shape();
+        intakeShape.moveTo(0, 0);
+        intakeShape.lineTo(0.4, 0.1); // Angled forward
+        intakeShape.lineTo(0.3, 0.3);
+        intakeShape.lineTo(-0.2, 0.2);
+        intakeShape.closePath();
+        const extrudeSettings = { depth: 0.1, bevelEnabled: true, bevelThickness: 0.02, bevelSize: 0.01, bevelSegments: 1 };
+        const intakeGeo = new THREE.ExtrudeGeometry(intakeShape, extrudeSettings);
 
-        const topFin = new THREE.Mesh(finGeometry, finMaterial);
-        topFin.position.set(0, 0.3, -0.4);
+        const leftIntake = new THREE.Mesh(intakeGeo, accentMat);
+        leftIntake.position.set(-0.2, 0, 0.2); // Side of fuselage
+        leftIntake.rotation.y = -Math.PI / 12; // Slight outward angle
+        leftIntake.rotation.z = -Math.PI / 18; // Slight downward angle
+        player.add(leftIntake);
+
+        const rightIntake = new THREE.Mesh(intakeGeo, accentMat);
+        rightIntake.position.set(0.2, 0, 0.2);
+        rightIntake.rotation.y = Math.PI / 12;
+        rightIntake.rotation.z = Math.PI / 18; // Mirrored angle
+        rightIntake.scale.x = -1; // Mirror geometry
+        player.add(rightIntake);
+
+
+        // Tail Fins
+        const tailFinGeo = new THREE.BoxGeometry(0.05, 0.4, 0.6); // Thin, tall, long
+        const topFin = new THREE.Mesh(tailFinGeo, accentMat);
+        topFin.position.set(0, 0.3, -0.8); // On top, rear
         player.add(topFin);
 
-        // --- Engine Glow ---
-        const engineGlowGeometry = new THREE.RingGeometry(0.05, 0.15, 8);
-        const engineGlowMaterial = new THREE.MeshBasicMaterial({
-            color: racerYellow,
-            transparent: true,
-            opacity: 0.8,
-            side: THREE.DoubleSide
-        });
+        const bottomFin = new THREE.Mesh(tailFinGeo, accentMat);
+        bottomFin.scale.set(0.8, 0.8, 0.8); // Slightly smaller
+        bottomFin.position.set(0, -0.25, -0.7);
+        player.add(bottomFin);
 
-        const engineGlow = new THREE.Mesh(engineGlowGeometry, engineGlowMaterial);
-        engineGlow.position.set(0, 0, -0.7);
-        engineGlow.rotation.x = Math.PI / 2;
-        player.add(engineGlow);
+
+        // Engine Nozzles (prominent)
+        const nozzleGeo = new THREE.CylinderGeometry(0.15, 0.1, 0.3, 12);
+        const leftNozzle = new THREE.Mesh(nozzleGeo, bodyMat);
+        leftNozzle.position.set(-0.15, 0, -1.2); // Back of fuselage
+        leftNozzle.rotation.x = Math.PI / 2;
+        player.add(leftNozzle);
+
+        const rightNozzle = new THREE.Mesh(nozzleGeo, bodyMat);
+        rightNozzle.position.set(0.15, 0, -1.2);
+        rightNozzle.rotation.x = Math.PI / 2;
+        player.add(rightNozzle);
+
+        // Engine Glow
+        const engineGlowCoreGeo = new THREE.SphereGeometry(0.08, 8, 8);
+        const leftEngineGlow = new THREE.Mesh(engineGlowCoreGeo, engineGlowMat);
+        leftEngineGlow.position.set(-0.15, 0, -1.3); // Inside nozzle
+        player.add(leftEngineGlow);
+        const rightEngineGlow = new THREE.Mesh(engineGlowCoreGeo, engineGlowMat);
+        rightEngineGlow.position.set(0.15, 0, -1.3);
+        player.add(rightEngineGlow);
     }
 
     // --- Alien Ship Design ---
     function createAlienShip(materialOptions) {
-        const alienGreen = 0x00ff66; // Bright green for main body
-        const alienPurple = 0xaa00ff; // Purple for accents
-        const alienBlue = 0x00ffff; // Cyan for details
-
-        // --- Main Body (organic, saucer-like) ---
-        const bodyGeometry = new THREE.SphereGeometry(0.6, 16, 8);
-        const bodyMaterial = new THREE.MeshPhongMaterial({
-            color: alienGreen,
-            ...materialOptions,
-            emissive: 0x003322,
-            emissiveIntensity: 0.3
+        const bodyMat = new THREE.MeshStandardMaterial({
+            color: 0x33AA33, // Organic Green
+            metalness: 0.2,
+            roughness: 0.7,
+            emissive: 0x115511,
+            emissiveIntensity: 0.5,
+            flatShading: false // More organic, less faceted
+        });
+        const accentMat = new THREE.MeshStandardMaterial({
+            color: 0xAA33AA, // Pulsing Purple
+            metalness: 0.1,
+            roughness: 0.5,
+            emissive: 0x551155,
+            emissiveIntensity: 1.5,
+            flatShading: false
+        });
+        const eyeMat = new THREE.MeshStandardMaterial({
+            color: 0xFFFF00, // Glowing Yellow
+            emissive: 0xFFFF00,
+            emissiveIntensity: 2,
+            flatShading: true
         });
 
-        const mainBody = new THREE.Mesh(bodyGeometry, bodyMaterial);
-        mainBody.scale.set(1, 0.3, 1); // Flatten into a saucer
+        // Main Body (Saucer-like, slightly irregular)
+        const bodyGeo = new THREE.SphereGeometry(0.6, 16, 12);
+        bodyGeo.scale(1, 0.4, 0.9); // Flatten and slightly stretch
+        const mainBody = new THREE.Mesh(bodyGeo, bodyMat);
         player.add(mainBody);
 
-        // --- Dome ---
-        const domeGeometry = new THREE.SphereGeometry(0.3, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2);
-        const domeMaterial = new THREE.MeshPhongMaterial({
-            color: alienBlue,
-            ...materialOptions,
-            opacity: 0.7,
-            transparent: true
-        });
+        // Central "Eye" or Dome
+        const eyeGeo = new THREE.SphereGeometry(0.2, 12, 8);
+        const centralEye = new THREE.Mesh(eyeGeo, eyeMat);
+        centralEye.position.set(0, 0.15, 0.1); // Slightly raised on top
+        player.add(centralEye);
 
-        const dome = new THREE.Mesh(domeGeometry, domeMaterial);
-        dome.position.set(0, 0.15, 0);
-        dome.rotation.x = Math.PI;
-        player.add(dome);
+        // Tentacle-like Appendages
+        const tentacleCurve = new THREE.CatmullRomCurve3([
+            new THREE.Vector3(0, 0, 0),
+            new THREE.Vector3(0.1, -0.1, 0.2),
+            new THREE.Vector3(-0.1, -0.2, 0.4),
+            new THREE.Vector3(0.05, -0.1, 0.6)
+        ]);
+        const tentacleGeo = new THREE.TubeGeometry(tentacleCurve, 8, 0.05, 6, false); // Thinner tentacles
 
-        // --- Tentacle-like Appendages ---
-        const tentacleGeometry = new THREE.CylinderGeometry(0.05, 0.02, 0.5, 8);
-        const tentacleMaterial = new THREE.MeshPhongMaterial({ color: alienPurple, ...materialOptions });
-
-        // Create multiple tentacles around the ship
-        for (let i = 0; i < 6; i++) {
-            const angle = (i / 6) * Math.PI * 2;
-            const x = Math.cos(angle) * 0.5;
-            const z = Math.sin(angle) * 0.5;
-
-            const tentacle = new THREE.Mesh(tentacleGeometry, tentacleMaterial);
-            tentacle.position.set(x, -0.2, z);
-
-            // Angle tentacles outward
-            tentacle.rotation.x = Math.PI / 4;
-            tentacle.rotation.y = -angle;
-
+        for (let i = 0; i < 5; i++) { // 5 tentacles
+            const tentacle = new THREE.Mesh(tentacleGeo, accentMat);
+            const angle = (i / 5) * Math.PI * 2 + (Math.PI / 5); // Offset start
+            const radius = 0.45;
+            tentacle.position.set(Math.cos(angle) * radius, -0.1, Math.sin(angle) * radius);
+            tentacle.rotation.y = -angle + Math.PI / 2;
+            tentacle.rotation.x = Math.random() * 0.2 - 0.1; // Slight random pitch
             player.add(tentacle);
         }
 
-        // --- Glowing Orbs ---
-        const orbGeometry = new THREE.SphereGeometry(0.08, 8, 8);
-        const orbMaterial = new THREE.MeshBasicMaterial({
-            color: alienBlue,
-            transparent: true,
-            opacity: 0.9
-        });
-
-        // Add orbs around the rim
-        for (let i = 0; i < 8; i++) {
-            const angle = (i / 8) * Math.PI * 2;
-            const x = Math.cos(angle) * 0.55;
-            const z = Math.sin(angle) * 0.55;
-
-            const orb = new THREE.Mesh(orbGeometry, orbMaterial);
-            orb.position.set(x, 0, z);
+        // Underside Pulsing Orbs
+        const orbGeo = new THREE.SphereGeometry(0.08, 8, 6);
+        for (let i = 0; i < 6; i++) {
+            const orb = new THREE.Mesh(orbGeo, accentMat);
+            const angle = (i / 6) * Math.PI * 2;
+            const radius = 0.35;
+            orb.position.set(Math.cos(angle) * radius, -0.15, Math.sin(angle) * radius * 0.8); // Slightly elliptical placement
+            // Add to player, will make them pulse in update loop if desired
             player.add(orb);
+            // Example: player.userData.pulsingOrbs = player.userData.pulsingOrbs || []; player.userData.pulsingOrbs.push(orb);
         }
-
-        // --- Bottom Glow ---
-        const glowGeometry = new THREE.CircleGeometry(0.4, 16);
-        const glowMaterial = new THREE.MeshBasicMaterial({
-            color: alienGreen,
-            transparent: true,
-            opacity: 0.5,
-            side: THREE.DoubleSide
-        });
-
-        const bottomGlow = new THREE.Mesh(glowGeometry, glowMaterial);
-        bottomGlow.position.set(0, -0.15, 0);
-        bottomGlow.rotation.x = Math.PI / 2;
-        player.add(bottomGlow);
+        player.rotation.y = Math.PI; // Face forward
     }
 
     // --- Crystal Ship Design ---
     function createCrystalShip(materialOptions) {
-        const crystalBlue = 0x66ccff; // Light blue for crystal
-        const crystalPink = 0xff66cc; // Pink for accents
-        const crystalWhite = 0xffffff; // White for core
-
-        // --- Main Crystal Body ---
-        const bodyGeometry = new THREE.OctahedronGeometry(0.6, 0); // Low poly crystal shape
-        const bodyMaterial = new THREE.MeshPhongMaterial({
-            color: crystalBlue,
-            ...materialOptions,
-            opacity: 0.7,
+        const crystalBodyMat = new THREE.MeshPhongMaterial({ // Phong for sharp highlights
+            color: 0x87CEFA, // Light Sky Blue
+            specular: 0xFFFFFF,
+            shininess: 80,
             transparent: true,
-            shininess: 100 // Very shiny
+            opacity: 0.75,
+            flatShading: true,
+            // side: THREE.DoubleSide // If some crystals are thin
+        });
+        const crystalCoreMat = new THREE.MeshPhongMaterial({
+            color: 0xFFC0CB, // Pink
+            emissive: 0xFF69B4, // Hot Pink emissive
+            emissiveIntensity: 1.5,
+            shininess: 50,
+            transparent: true,
+            opacity: 0.85,
+            flatShading: true
+        });
+        const crystalAccentMat = new THREE.MeshPhongMaterial({
+            color: 0xE0FFFF, // Light Cyan
+            specular: 0xFFFFFF,
+            shininess: 90,
+            transparent: true,
+            opacity: 0.7,
+            flatShading: true
         });
 
-        const mainBody = new THREE.Mesh(bodyGeometry, bodyMaterial);
-        mainBody.rotation.x = Math.PI / 4; // Tilt for better orientation
-        player.add(mainBody);
 
-        // --- Inner Core ---
-        const coreGeometry = new THREE.OctahedronGeometry(0.3, 0);
-        const coreMaterial = new THREE.MeshPhongMaterial({
-            color: crystalWhite,
-            ...materialOptions,
-            emissive: 0xaaaaaa,
-            emissiveIntensity: 0.8
-        });
+        // Central Core Crystal
+        const coreGeo = new THREE.OctahedronGeometry(0.3, 0); // Simple octahedron for core
+        const coreCrystal = new THREE.Mesh(coreGeo, crystalCoreMat);
+        coreCrystal.position.y = 0.1;
+        player.add(coreCrystal);
 
-        const core = new THREE.Mesh(coreGeometry, coreMaterial);
-        core.rotation.x = Math.PI / 4; // Match main body rotation
-        player.add(core);
+        // Main Crystalline Structures (larger shards around core)
+        const numMainShards = 5;
+        for (let i = 0; i < numMainShards; i++) {
+            const shardHeight = Math.random() * 0.5 + 0.4; // 0.4 to 0.9
+            const shardRadius = Math.random() * 0.15 + 0.1; // 0.1 to 0.25
+            const shardGeo = new THREE.ConeGeometry(shardRadius, shardHeight, Math.floor(Math.random()*3)+4, 1); // 4-6 sides, 1 height segment for sharpness
 
-        // --- Crystal Shards ---
-        const shardGeometry = new THREE.TetrahedronGeometry(0.2, 0);
-        const shardMaterial = new THREE.MeshPhongMaterial({
-            color: crystalPink,
-            ...materialOptions,
-            opacity: 0.8,
-            transparent: true
-        });
+            const shard = new THREE.Mesh(shardGeo, crystalBodyMat);
 
-        // Add crystal shards around the main body
-        for (let i = 0; i < 5; i++) {
-            const angle = (i / 5) * Math.PI * 2;
-            const x = Math.cos(angle) * 0.7;
-            const z = Math.sin(angle) * 0.7;
-
-            const shard = new THREE.Mesh(shardGeometry, shardMaterial);
-            shard.position.set(x, 0, z);
-
-            // Rotate shards to point outward
-            shard.lookAt(new THREE.Vector3(x * 2, 0, z * 2));
+            const angle = (i / numMainShards) * Math.PI * 2;
+            const radius = 0.35;
+            shard.position.set(
+              Math.cos(angle) * radius,
+              0.1, // Base of shards around core's y
+              Math.sin(angle) * radius
+            );
+            // Point shards outwards and slightly upwards/downwards
+            shard.lookAt(new THREE.Vector3(Math.cos(angle) * radius * 2, Math.random() * 0.4 - 0.2, Math.sin(angle) * radius * 2));
+            shard.rotation.x += Math.PI / 2; // Correct cone orientation after lookAt
 
             player.add(shard);
         }
 
-        // --- Top Crystal ---
-        const topShardGeometry = new THREE.ConeGeometry(0.2, 0.5, 4);
-        const topShardMaterial = new THREE.MeshPhongMaterial({
-            color: crystalPink,
-            ...materialOptions,
-            opacity: 0.8,
-            transparent: true
-        });
+        // Smaller Accent Crystals
+        const numAccentShards = 8;
+        for (let i = 0; i < numAccentShards; i++) {
+            const shardSize = Math.random() * 0.15 + 0.05; // 0.05 to 0.2
+            // Use Tetrahedron for very sharp small crystals
+            const shardGeo = new THREE.TetrahedronGeometry(shardSize, 0);
+            const shard = new THREE.Mesh(shardGeo, crystalAccentMat);
 
-        const topShard = new THREE.Mesh(topShardGeometry, topShardMaterial);
-        topShard.position.set(0, 0.7, 0);
-        player.add(topShard);
-
-        // --- Energy Field ---
-        const fieldGeometry = new THREE.SphereGeometry(0.8, 8, 8);
-        const fieldMaterial = new THREE.MeshBasicMaterial({
-            color: crystalBlue,
-            transparent: true,
-            opacity: 0.2,
-            wireframe: true
-        });
-
-        const energyField = new THREE.Mesh(fieldGeometry, fieldMaterial);
-        player.add(energyField);
+            // Scatter them around the main cluster
+            shard.position.set(
+              (Math.random() - 0.5), // Wider spread
+              (Math.random() - 0.5) * 0.4,
+              (Math.random() - 0.5)
+            );
+            shard.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+            player.add(shard);
+        }
+        player.scale.set(0.9, 0.9, 0.9); // Slightly smaller overall for crystal ship
     }
 
     // --- Update Player Position ---
@@ -2367,7 +2295,7 @@
 
     // --- Start Game Function ---
     function startGame() {
-        if (gameState === 'playing') return;
+        if (gameState === 'playing' || gameState === 'countdown') return;
 
         // Initialize audio after user interaction
         sounds.initializeAudio();
@@ -2435,9 +2363,87 @@
         // Mobile device detection and touch controls setup
         setupMobileControls();
 
-        gameState = 'playing';
+        // Start countdown instead of going directly to playing
+        startCountdown();
+    }
+
+    // --- Start Countdown Function ---
+    function startCountdown() {
+        // Set game state to countdown
+        gameState = 'countdown';
         isPaused = false;
         player.visible = true;
+
+        // Initialize countdown
+        countdownTime = 3;
+        countdownStartTime = performance.now();
+
+        // Show initial countdown
+        showCountdown(countdownTime);
+    }
+
+    // --- Show Countdown Function ---
+    function showCountdown(number) {
+        // Create a div for the countdown
+        const countdownDiv = document.createElement('div');
+        countdownDiv.id = 'countdown-display';
+        countdownDiv.textContent = number;
+        countdownDiv.style.position = 'absolute';
+        countdownDiv.style.top = '50%';
+        countdownDiv.style.left = '50%';
+        countdownDiv.style.transform = 'translate(-50%, -50%)';
+        countdownDiv.style.color = '#00ffff';
+        countdownDiv.style.textShadow = '0 0 10px #00ffff';
+        countdownDiv.style.fontSize = '6em';
+        countdownDiv.style.fontFamily = "Orbitron, sans-serif";
+        countdownDiv.style.zIndex = '1000';
+        countdownDiv.style.pointerEvents = 'none';
+
+        // Remove any existing countdown display
+        const existingCountdown = document.getElementById('countdown-display');
+        if (existingCountdown) {
+            document.body.removeChild(existingCountdown);
+        }
+
+        // Add to document
+        document.body.appendChild(countdownDiv);
+
+        // Animate the countdown number
+        countdownDiv.style.transition = 'transform 0.5s, opacity 0.5s';
+        setTimeout(() => {
+            countdownDiv.style.transform = 'translate(-50%, -50%) scale(1.5)';
+            countdownDiv.style.opacity = '0';
+        }, 10);
+    }
+
+    // --- Update Countdown Function ---
+    function updateCountdown(deltaTime) {
+        if (gameState !== 'countdown') return;
+
+        const currentTime = performance.now();
+        const elapsedTime = (currentTime - countdownStartTime) / 1000; // Convert to seconds
+        const remainingTime = Math.ceil(3 - elapsedTime);
+
+        // If the countdown number has changed, show the new number
+        if (remainingTime !== countdownTime && remainingTime > 0) {
+            countdownTime = remainingTime;
+            showCountdown(countdownTime);
+        }
+
+        // When countdown reaches 0, start the game
+        if (remainingTime <= 0) {
+            // Remove countdown display
+            const countdownDiv = document.getElementById('countdown-display');
+            if (countdownDiv) {
+                document.body.removeChild(countdownDiv);
+            }
+
+            // Show "GO!" message
+            showMessage("GO!", 0x00ffff);
+
+            // Start the game
+            gameState = 'playing';
+        }
     }
 
     // --- Reset for Next Level ---
@@ -3338,7 +3344,14 @@
 
         // Update game state
         if (!isPaused) {
-            update(deltaTime);
+            // Handle countdown state
+            if (gameState === 'countdown') {
+                updateCountdown(deltaTime);
+            }
+            // Handle playing state
+            else if (gameState === 'playing') {
+                update(deltaTime);
+            }
         }
 
         // Render
