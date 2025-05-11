@@ -643,7 +643,7 @@
     const BOMB_POINTS = 3000;
     // Configurable Settings
     let playerLaneChangeRate = 6;
-    let currentEnemySpeed = 0.05;
+    let currentEnemySpeed = 0.08;
     let currentEnemySpawnInterval = 50;
     let enemiesPerLevel = 20;
 
@@ -1598,22 +1598,22 @@
         // Difficulty
         switch (difficultyParam) {
             case 'easy':
-                currentEnemySpeed = 0.03;
+                currentEnemySpeed = 0.1;
                 currentEnemySpawnInterval = 80;
                 enemiesPerLevel = 15;
                 break;
             case 'medium':
-                currentEnemySpeed = 0.05;
+                currentEnemySpeed = 0.2;
                 currentEnemySpawnInterval = 50;
                 enemiesPerLevel = 20;
                 break;
             case 'hard':
-                currentEnemySpeed = 0.07;
+                currentEnemySpeed = 0.3;
                 currentEnemySpawnInterval = 30;
                 enemiesPerLevel = 25;
                 break;
             default:
-                currentEnemySpeed = 0.05;
+                currentEnemySpeed = 0.08;
                 currentEnemySpawnInterval = 50;
                 enemiesPerLevel = 20;
         }
@@ -2224,7 +2224,7 @@
             const enemy = enemies[i];
 
             // Move enemy along its direction vector (accounting for tunnel rotation)
-            const speed = currentEnemySpeed * (enemy.isSpecial ? 1.2 : 1.0);
+            const speed = currentEnemySpeed * (enemy.isSpecial ? 1.5 : 1.0);
             if (enemy.direction) {
                 enemy.position.x += enemy.direction.x * speed;
                 enemy.position.y += enemy.direction.y * speed;
