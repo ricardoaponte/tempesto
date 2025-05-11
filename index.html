@@ -603,6 +603,8 @@
     const enemies = [];
     const powerUps = [];
     const explosions = [];
+    const stars = [];
+    const NUM_STARS = 200; // Number of background stars
     const keyState = {};
     let difficulty = 'medium'; // Default difficulty
     let shipType = 'classic'; // Default ship type
@@ -1169,6 +1171,9 @@
         // Add lighting to enhance 3D effects
         addLighting();
 
+        // Create background stars
+        createStars();
+
         // Create the initial web - it will be recreated with startGame
         createWeb(webType);
 
@@ -1247,6 +1252,68 @@
         const pointLight = new THREE.PointLight(0x0088ff, 0.8, 50);
         pointLight.position.copy(camera.position);
         scene.add(pointLight);
+    }
+
+    // --- Create Background Stars ---
+    function createStars() {
+        // Clear any existing stars
+        for (let i = stars.length - 1; i >= 0; i--) {
+            scene.remove(stars[i]);
+            stars.splice(i, 1);
+        }
+
+        // Create new stars
+        for (let i = 0; i < NUM_STARS; i++) {
+            // Random star size
+            const size = Math.random() * 0.15 + 0.05;
+
+            // Create star geometry and material
+            const starGeometry = new THREE.SphereGeometry(size, 4, 4);
+
+            // Random star color (mostly white/blue with occasional yellow/red)
+            let starColor;
+            const colorRand = Math.random();
+            if (colorRand > 0.9) {
+                // Yellow/gold stars (10%)
+                starColor = new THREE.Color(0xffffaa);
+            } else if (colorRand > 0.8) {
+                // Red/orange stars (10%)
+                starColor = new THREE.Color(0xffaa88);
+            } else if (colorRand > 0.6) {
+                // Blue stars (20%)
+                starColor = new THREE.Color(0xaaddff);
+            } else {
+                // White/blue-white stars (60%)
+                starColor = new THREE.Color(0xeeffff);
+            }
+
+            const starMaterial = new THREE.MeshBasicMaterial({
+                color: starColor,
+                transparent: true,
+                opacity: Math.random() * 0.5 + 0.5
+            });
+
+            const star = new THREE.Mesh(starGeometry, starMaterial);
+
+            // Random position in a large sphere around the scene
+            const radius = 100 + Math.random() * 100; // Between 100-200 units from center
+            const theta = Math.random() * Math.PI * 2; // Random angle around y-axis
+            const phi = Math.random() * Math.PI; // Random angle from top to bottom
+
+            star.position.x = radius * Math.sin(phi) * Math.cos(theta);
+            star.position.y = radius * Math.sin(phi) * Math.sin(theta);
+            star.position.z = radius * Math.cos(phi);
+
+            // Add random movement speed for animation
+            star.userData = {
+                rotationSpeed: (Math.random() - 0.5) * 0.001,
+                twinkleSpeed: Math.random() * 0.01 + 0.005,
+                twinklePhase: Math.random() * Math.PI * 2
+            };
+
+            scene.add(star);
+            stars.push(star);
+        }
     }
 
     // --- Create Web Geometry based on selected type ---
@@ -1460,114 +1527,309 @@
     }
 
     // --- Classic Ship Design ---
-    function createClassicShip(materialOptions) {
-        const shipBlue = 0x0055ff; // Classic player blue
-        const shipRed = 0xff0000;   // Accent red
-        const shipYellow = 0xffff00; // Accent yellow
+    function createClassicShip() {
+        // Remove existing player if any
+        if (player) {
+            scene.remove(player);
+            player.traverse(child => {
+                if (child.isMesh) {
+                    child.geometry.dispose();
+                    if (Array.isArray(child.material)) {
+                        child.material.forEach(material => material.dispose());
+                    } else {
+                        child.material.dispose();
+                    }
+                }
+            });
+        }
 
-        // --- Main Body ---
-        // A slightly wedge-shaped or trapezoidal body is common
-        const bodyShape = new THREE.Shape();
-        const bodyWidth = 0.8;
-        const bodyDepthFront = 0.4;
-        const bodyDepthBack = 0.7;
-        const bodyLength = 1.0;
+        player = new THREE.Group();
 
-        bodyShape.moveTo(-bodyWidth / 2, -bodyLength / 2 + bodyDepthFront); // Back-left
-        bodyShape.lineTo(bodyWidth / 2, -bodyLength / 2 + bodyDepthFront);  // Back-right
-        bodyShape.lineTo(bodyWidth / 2, bodyLength / 2 - bodyDepthBack);   // Front-right (tapered)
-        bodyShape.lineTo(-bodyWidth / 2, bodyLength / 2 - bodyDepthBack);  // Front-left (tapered)
-        bodyShape.closePath();
+        // --- PBR Materials ---
+        const primaryMetalColor = 0x9eadb6;
+        const secondaryMetalColor = 0x505a63;
+        const accentEmissiveColor = 0x00bfff;
+        const engineGlowColor = 0xffa500;
+        const cockpitGlassColor = 0x102040;
+        const panelLineColor = 0x20252a; // Very dark for panel lines
+        const decalColor = 0xffcc00; // A prominent yellow for decals
 
-        const extrudeSettings = {
-            steps: 1,
-            depth: 0.3, // Thickness of the body
-            bevelEnabled: false,
-        };
-        const bodyGeometry = new THREE.ExtrudeGeometry(bodyShape, extrudeSettings);
-        const bodyMaterial = new THREE.MeshPhongMaterial({ color: shipBlue, ...materialOptions });
-        const mainBody = new THREE.Mesh(bodyGeometry, bodyMaterial);
-        mainBody.rotation.x = Math.PI / 2; // Lay it flat
-        mainBody.position.z = -0.15; // Adjust position to align with prongs
-        player.add(mainBody);
+        const mainMetalMaterial = new THREE.MeshStandardMaterial({
+            color: primaryMetalColor, metalness: 0.9, roughness: 0.35, envMapIntensity: 0.8
+        });
+        const darkMetalMaterial = new THREE.MeshStandardMaterial({
+            color: secondaryMetalColor, metalness: 0.8, roughness: 0.55, envMapIntensity: 0.7
+        });
+        const accentEmissiveMaterial = new THREE.MeshStandardMaterial({
+            color: accentEmissiveColor, emissive: accentEmissiveColor, emissiveIntensity: 1.8,
+            metalness: 0.2, roughness: 0.4,
+        });
+        const cockpitGlassMaterial = new THREE.MeshStandardMaterial({
+            color: cockpitGlassColor, metalness: 0.1, roughness: 0.1, transparent: true,
+            opacity: 0.25, emissive: 0x112233, emissiveIntensity: 0.6
+        });
+        const engineGlowMaterial = new THREE.MeshStandardMaterial({
+            color: engineGlowColor, emissive: engineGlowColor, emissiveIntensity: 2.5,
+            metalness: 0.0, roughness: 0.8,
+        });
+        const engineInternalMaterial = new THREE.MeshStandardMaterial({
+            color: 0x222222, metalness: 0.9, roughness: 0.6
+        });
+        const panelLineMaterial = new THREE.MeshStandardMaterial({ // For simulating panel lines
+            color: panelLineColor, metalness: 0.5, roughness: 0.7
+        });
+        const decalMaterial = new THREE.MeshStandardMaterial({
+            color: decalColor, metalness: 0.3, roughness: 0.6, emissive: decalColor, emissiveIntensity: 0.1
+        });
 
 
-        // --- "Prongs" / "Cannons" (the iconic forward parts) ---
-        const prongLength = 1.0;
-        const prongWidth = 0.25;
-        const prongHeight = 0.25;
+        // --- Main Fuselage ---
+        const fuselageRadius = 0.45;
+        const fuselageLength = 2.2;
 
-        const prongGeometry = new THREE.BoxGeometry(prongWidth, prongHeight, prongLength);
-        const prongMaterial = new THREE.MeshPhongMaterial({ color: shipBlue, ...materialOptions });
+        const fuselageCylinderGeo = new THREE.CylinderGeometry(fuselageRadius, fuselageRadius * 0.75, fuselageLength, 32, 4);
+        const fuselageCylinder = new THREE.Mesh(fuselageCylinderGeo, mainMetalMaterial);
+        fuselageCylinder.rotation.x = Math.PI / 2;
+        player.add(fuselageCylinder);
 
-        // Left Prong
-        const leftProng = new THREE.Mesh(prongGeometry, prongMaterial);
-        leftProng.position.set(-0.35, 0, 0.2); // Position to the side and slightly forward of body center
-        player.add(leftProng);
+        const noseConeGeo = new THREE.ConeGeometry(fuselageRadius, fuselageLength * 0.3, 32);
+        const noseCone = new THREE.Mesh(noseConeGeo, mainMetalMaterial);
+        noseCone.position.z = -fuselageLength / 2 - (fuselageLength * 0.3) / 2 + 0.01;
+        noseCone.rotation.x = Math.PI / 2;
+        player.add(noseCone);
 
-        // Right Prong
-        const rightProng = new THREE.Mesh(prongGeometry, prongMaterial);
-        rightProng.position.set(0.35, 0, 0.2); // Position to the side and slightly forward of body center
-        player.add(rightProng);
+        const tailSectionGeo = new THREE.CylinderGeometry(fuselageRadius * 0.75, fuselageRadius * 0.6, fuselageLength * 0.2, 32);
+        const tailSection = new THREE.Mesh(tailSectionGeo, darkMetalMaterial);
+        tailSection.rotation.x = Math.PI / 2;
+        tailSection.position.z = fuselageLength / 2 + (fuselageLength * 0.2) / 2 - 0.01;
+        player.add(tailSection);
 
-        // Prong Tips (Red accents)
-        const tipGeometry = new THREE.BoxGeometry(prongWidth, prongHeight, 0.2);
-        const tipMaterial = new THREE.MeshPhongMaterial({ color: shipRed, ...materialOptions });
+        // Fuselage Panel Lines (simulated with thin boxes)
+        const panelLineDepth = 0.01;
+        const panelLineThickness = 0.015;
+        for (let i = 0; i < 5; i++) { // Circumferential lines
+            const zPos = -fuselageLength / 2 + (i * fuselageLength / 4.5) + fuselageLength * 0.05;
+            const currentRadius = fuselageRadius * (1 - 0.25 * Math.abs(zPos) / (fuselageLength / 2)); // Approx radius at z
+            const panelLineGeo = new THREE.TorusGeometry(currentRadius + panelLineDepth, panelLineThickness, 8, 64);
+            const panelLine = new THREE.Mesh(panelLineGeo, panelLineMaterial);
+            panelLine.position.z = zPos;
+            panelLine.rotation.x = Math.PI / 2;
+            player.add(panelLine);
+        }
+        for (let i = 0; i < 4; i++) { // Longitudinal lines
+            const panelLineGeo = new THREE.BoxGeometry(panelLineThickness, panelLineThickness, fuselageLength * 0.9);
+            const panelLine = new THREE.Mesh(panelLineGeo, panelLineMaterial);
+            const angle = (i / 4) * Math.PI * 2;
+            panelLine.position.set(
+              Math.cos(angle) * (fuselageRadius * 0.9 + panelLineDepth),
+              Math.sin(angle) * (fuselageRadius * 0.9 + panelLineDepth),
+              0
+            );
+            panelLine.lookAt(0,0,0); // Align with center, then rotate
+            panelLine.rotation.z += Math.PI/2;
+            player.add(panelLine);
+        }
 
-        const leftTip = new THREE.Mesh(tipGeometry, tipMaterial);
-        leftTip.position.set(0, 0, prongLength / 2 + 0.1); // At the front of the prong
-        leftProng.add(leftTip); // Add as child of prong for easier positioning
+        // Dorsal Spine with more detail
+        const dorsalSpineBaseGeo = new THREE.BoxGeometry(0.2, 0.15, fuselageLength * 0.8);
+        const dorsalSpineBase = new THREE.Mesh(dorsalSpineBaseGeo, darkMetalMaterial);
+        dorsalSpineBase.position.set(0, fuselageRadius * 0.8, -0.1);
+        player.add(dorsalSpineBase);
 
-        const rightTip = new THREE.Mesh(tipGeometry, tipMaterial);
-        rightTip.position.set(0, 0, prongLength / 2 + 0.1); // At the front of the prong
-        rightProng.add(rightTip); // Add as child of prong
+        const dorsalAntennaMountGeo = new THREE.CylinderGeometry(0.04,0.05,0.1, 8);
+        const dorsalAntennaMount = new THREE.Mesh(dorsalAntennaMountGeo, mainMetalMaterial);
+        dorsalAntennaMount.position.y = 0.075;
+        dorsalAntennaMount.position.z = -fuselageLength * 0.2;
+        dorsalSpineBase.add(dorsalAntennaMount);
 
 
         // --- Cockpit ---
-        // A simple, slightly raised block
-        const cockpitWidth = 0.3;
-        const cockpitHeight = 0.2;
-        const cockpitDepth = 0.25;
-        const cockpitGeometry = new THREE.BoxGeometry(cockpitWidth, cockpitHeight, cockpitDepth);
-        const cockpitMaterial = new THREE.MeshPhongMaterial({ color: shipYellow, ...materialOptions, emissive:0x333300 });
-        const cockpit = new THREE.Mesh(cockpitGeometry, cockpitMaterial);
-        cockpit.position.set(0, extrudeSettings.depth / 2 + cockpitHeight / 2 -0.05, -0.3); // On top of the body, slightly back
-        player.add(cockpit);
+        const cockpitBaseGeo = new THREE.CylinderGeometry(fuselageRadius * 0.7, fuselageRadius * 0.8, 0.2, 24);
+        const cockpitBase = new THREE.Mesh(cockpitBaseGeo, darkMetalMaterial);
+        cockpitBase.rotation.x = Math.PI / 2;
+        cockpitBase.position.set(0, fuselageRadius * 0.3, -fuselageLength * 0.28);
+        player.add(cockpitBase);
+
+        const cockpitCanopyGeo = new THREE.SphereGeometry(fuselageRadius * 0.6, 32, 16, 0, Math.PI * 2, 0, Math.PI / 1.8);
+        const cockpitCanopy = new THREE.Mesh(cockpitCanopyGeo, cockpitGlassMaterial);
+        cockpitCanopy.scale.set(1, 0.8, 1.3);
+        cockpitCanopy.position.set(0, 0.15, 0.05);
+        cockpitCanopy.rotation.x = -Math.PI / 30;
+        cockpitBase.add(cockpitCanopy);
+
+        const frameThickness = 0.03;
+        const canopyFrameGeo = new THREE.TorusGeometry(fuselageRadius * 0.6 * 1.3 - frameThickness, frameThickness, 8, 32);
+        const canopyFrame = new THREE.Mesh(canopyFrameGeo, darkMetalMaterial);
+        canopyFrame.scale.y = (0.8 / 1.3);
+        canopyFrame.rotation.x = Math.PI / 2;
+        cockpitCanopy.add(canopyFrame);
+
+        // Cockpit Interior Hint
+        const cockpitSeatGeo = new THREE.BoxGeometry(0.2, 0.3, 0.15);
+        const cockpitSeatMat = new THREE.MeshStandardMaterial({color:0x222222, roughness:0.8});
+        const cockpitSeat = new THREE.Mesh(cockpitSeatGeo, cockpitSeatMat);
+        cockpitSeat.position.set(0, -0.1, -0.1); // Inside the canopy
+        cockpitCanopy.add(cockpitSeat);
+        const cockpitConsoleGeo = new THREE.BoxGeometry(0.25, 0.1, 0.2);
+        const cockpitConsole = new THREE.Mesh(cockpitConsoleGeo, cockpitSeatMat);
+        cockpitConsole.position.set(0, -0.05, 0.15);
+        cockpitConsole.rotation.x = Math.PI/6;
+        cockpitCanopy.add(cockpitConsole);
 
 
-        // --- Thruster ---
-        // Simple cone, often red or orange
-        const thrusterRadius = 0.2;
-        const thrusterHeight = 0.4;
-        const thrusterGeometry = new THREE.ConeGeometry(thrusterRadius, thrusterHeight, 8); // 8 segments for blockiness
-        const thrusterMaterial = new THREE.MeshPhongMaterial({
-            color: shipRed,
-            emissive: 0xcc3300, // Make it glow a bit
-            emissiveIntensity: 0.7,
-            ...materialOptions
+        // --- Wings ---
+        const wingShape = new THREE.Shape();
+        wingShape.moveTo(0, 0.1); wingShape.lineTo(0.3, 0.2);
+        wingShape.bezierCurveTo(1.0, 0.3, 1.5, 0.1, 2.0, 0.0);
+        wingShape.lineTo(1.8, -0.2);
+        wingShape.bezierCurveTo(1.2, -0.25, 0.5, -0.1, 0.1, -0.15);
+        wingShape.closePath();
+        const extrudeSettings = {
+            steps: 1, depth: 0.07, bevelEnabled: true,
+            bevelThickness: 0.015, bevelSize: 0.015, bevelSegments: 2
+        };
+        const wingGeometry = new THREE.ExtrudeGeometry(wingShape, extrudeSettings);
+
+        function createWing(isLeft) {
+            const wingGroup = new THREE.Group();
+            const wing = new THREE.Mesh(wingGeometry, mainMetalMaterial);
+            wing.rotation.y = isLeft ? Math.PI / 2 : -Math.PI / 2;
+            if (!isLeft) wing.scale.x = -1;
+            wingGroup.add(wing);
+
+            // Aileron (Control Surface)
+            const aileronWidth = 0.8;
+            const aileronDepth = 0.2;
+            const aileronGeo = new THREE.BoxGeometry(aileronWidth, extrudeSettings.depth * 0.9, aileronDepth);
+            const aileron = new THREE.Mesh(aileronGeo, darkMetalMaterial);
+            aileron.position.set(isLeft ? 1.4 : -1.4, 0, -0.1); // Outer trailing edge
+            wingGroup.add(aileron);
+
+            const pylonGeo = new THREE.CylinderGeometry(0.05, 0.04, 0.3, 12);
+            const pylon = new THREE.Mesh(pylonGeo, darkMetalMaterial);
+            pylon.rotation.z = Math.PI / 2;
+            pylon.position.set(isLeft ? 1.9 : -1.9, 0, 0.15);
+            wingGroup.add(pylon);
+
+            const navLightGeo = new THREE.SphereGeometry(0.03, 8, 8);
+            const redLightMat = new THREE.MeshStandardMaterial({ emissive: 0xff0000, emissiveIntensity: 3, color:0xff0000});
+            const greenLightMat = new THREE.MeshStandardMaterial({ emissive: 0x00ff00, emissiveIntensity: 3, color:0x00ff00});
+            const navLight = new THREE.Mesh(navLightGeo, isLeft ? redLightMat : greenLightMat);
+            navLight.position.set(0, 0, 0.15 + 0.03);
+            pylon.add(navLight);
+
+            // Decal on Wing
+            const decalShape = new THREE.Shape();
+            decalShape.moveTo(-0.2, 0); decalShape.lineTo(0.2, 0); decalShape.lineTo(0.1, 0.1); decalShape.lineTo(-0.1, 0.1); decalShape.closePath(); // Simple chevron
+            const decalExtrudeSettings = { depth: 0.005, bevelEnabled: false };
+            const decalGeo = new THREE.ExtrudeGeometry(decalShape, decalExtrudeSettings);
+            const wingDecal = new THREE.Mesh(decalGeo, decalMaterial);
+            wingDecal.position.set(isLeft? 0.8 : -0.8, extrudeSettings.depth/2 + 0.003, 0.05); // On top of wing
+            wingDecal.rotation.x = -Math.PI/2;
+            wingGroup.add(wingDecal);
+
+            wingGroup.position.set(isLeft ? -fuselageRadius * 0.6 : fuselageRadius * 0.6, 0, -fuselageLength * 0.05);
+            wingGroup.rotation.z = isLeft ? Math.PI / 20 : -Math.PI / 20;
+            return wingGroup;
+        }
+        player.add(createWing(true)); player.add(createWing(false));
+
+
+        // --- Engines ---
+        function createEngine(offsetX, offsetY, offsetZ) {
+            const engineGroup = new THREE.Group();
+            const nacelleGeo = new THREE.CylinderGeometry(0.3, 0.25, 1.0, 24);
+            const nacelle = new THREE.Mesh(nacelleGeo, darkMetalMaterial);
+            nacelle.rotation.x = Math.PI / 2;
+            engineGroup.add(nacelle);
+
+            const intakeShape = new THREE.Shape(); /* ... (same as before) ... */
+            intakeShape.moveTo(0.3, 0.1); intakeShape.absarc(0, 0, 0.3, Math.PI * 0.1, Math.PI * -0.1, true); intakeShape.lineTo(0.25, -0.05); intakeShape.absarc(0,0, 0.25, Math.PI * -0.08, Math.PI * 0.08, false);
+            const intakeExtrudeSettings = {depth: 0.15, bevelEnabled:true, bevelThickness:0.01, bevelSize:0.01};
+            const intakeGeo = new THREE.ExtrudeGeometry(intakeShape, intakeExtrudeSettings);
+            const intake = new THREE.Mesh(intakeGeo, mainMetalMaterial);
+            intake.position.z = -0.5 - 0.075; intake.rotation.y = Math.PI/2;
+            engineGroup.add(intake);
+
+            const nozzleBaseGeo = new THREE.CylinderGeometry(0.25, 0.28, 0.2, 24);
+            const nozzleBase = new THREE.Mesh(nozzleBaseGeo, engineInternalMaterial);
+            nozzleBase.rotation.x = Math.PI/2; nozzleBase.position.z = 0.5;
+            engineGroup.add(nozzleBase);
+
+            for (let i = 0; i < 6; i++) { /* ... (petals same as before) ... */
+                const petalGeo = new THREE.BoxGeometry(0.03, 0.15, 0.2); const petal = new THREE.Mesh(petalGeo, darkMetalMaterial);
+                const angle = (i / 6) * Math.PI * 2; petal.position.set(Math.cos(angle) * 0.2, Math.sin(angle) * 0.2, 0.05);
+                petal.lookAt(0,0,0.05); petal.rotation.z += Math.PI/2; nozzleBase.add(petal);
+            }
+            const glowCoreGeo = new THREE.SphereGeometry(0.15, 16, 8);
+            const glowCore = new THREE.Mesh(glowCoreGeo, engineGlowMaterial);
+            glowCore.position.z = 0.05; nozzleBase.add(glowCore);
+            engineGroup.userData.glowCore = glowCore;
+
+            const outerGlowGeo = new THREE.SphereGeometry(0.28, 16, 8);
+            const outerGlowMat = new THREE.MeshBasicMaterial({ color: engineGlowColor, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending });
+            const outerGlow = new THREE.Mesh(outerGlowGeo, outerGlowMat);
+            outerGlow.position.z = 0.1; nozzleBase.add(outerGlow);
+            engineGroup.userData.outerGlow = outerGlow;
+
+            // Engine Greebles (e.g., pipes, heat sinks)
+            const pipeGeo = new THREE.TorusGeometry(0.28, 0.015, 8, 32, Math.PI); // Half torus
+            const pipe1 = new THREE.Mesh(pipeGeo, darkMetalMaterial);
+            pipe1.rotation.x = Math.PI/2; pipe1.rotation.z = Math.PI/4;
+            pipe1.position.z = -0.2;
+            engineGroup.add(pipe1);
+            const heatSinkGeo = new THREE.BoxGeometry(0.05, 0.05, 0.4);
+            for(let i=0; i<3; i++){
+                const heatSink = new THREE.Mesh(heatSinkGeo, mainMetalMaterial);
+                heatSink.position.set( (i-1)*0.07, 0.28, 0); // On top of nacelle
+                engineGroup.add(heatSink);
+            }
+
+            engineGroup.position.set(offsetX, offsetY, offsetZ);
+            return engineGroup;
+        }
+        player.add(createEngine(-fuselageRadius * 1.4, -fuselageRadius * 0.2, fuselageLength * 0.3));
+        player.add(createEngine(fuselageRadius * 1.4, -fuselageRadius * 0.2, fuselageLength * 0.3));
+
+
+        // --- Ventral Area & Radiators ---
+        const ventralPlateGeo = new THREE.BoxGeometry(fuselageRadius * 1.2, 0.05, fuselageLength * 0.5);
+        const ventralPlate = new THREE.Mesh(ventralPlateGeo, darkMetalMaterial);
+        ventralPlate.position.set(0, -fuselageRadius - 0.025, 0);
+        player.add(ventralPlate);
+
+        const radiatorPanelGeo = new THREE.BoxGeometry(0.2, 0.03, 0.6);
+        for(let i=0; i<2; i++){
+            const radiator = new THREE.Mesh(radiatorPanelGeo, mainMetalMaterial);
+            radiator.position.set( (i === 0 ? -1:1) * (fuselageRadius*0.3), -0.04, 0.1);
+            // radiator.rotation.x = Math.PI/12; // Angle them slightly
+            ventralPlate.add(radiator); // Attach to ventral plate
+
+            // Radiator Grill (thin lines)
+            for(let j=0; j<5; j++){
+                const grillLineGeo = new THREE.BoxGeometry(0.18, 0.005, 0.01);
+                const grillLine = new THREE.Mesh(grillLineGeo, panelLineMaterial);
+                grillLine.position.set(0, 0.016, (j-2)*0.1);
+                radiator.add(grillLine);
+            }
+        }
+
+        // --- Additional Emissive Details / Small Sensors ---
+        const sensorBumpGeo = new THREE.SphereGeometry(0.025, 12, 8);
+        const positions = [
+            {x: 0, y: fuselageRadius*0.9, z: -fuselageLength*0.45}, // Top front
+            {x: fuselageRadius*0.5, y: 0, z: -fuselageLength*0.3},  // Side front
+            {x: -fuselageRadius*0.5, y: 0, z: -fuselageLength*0.3}
+        ];
+        positions.forEach(pos => {
+            const sensor = new THREE.Mesh(sensorBumpGeo, accentEmissiveMaterial);
+            sensor.position.set(pos.x, pos.y, pos.z);
+            player.add(sensor);
         });
-        const thruster = new THREE.Mesh(thrusterGeometry, thrusterMaterial);
-        // Position at the back of the main body. The mainBody was extruded along Z, then rotated.
-        // Let's place it relative to the player group's origin.
-        thruster.position.set(0, 0, -0.6); // Slightly behind the main body
-        thruster.rotation.x = Math.PI / 2; // Pointing backwards along negative Z local to player group
-        player.add(thruster);
 
 
-        // --- Player Orientation ---
-        // Ships typically "face up" on the screen.
-        // If your game's "forward" is along -Z (common), you might want to rotate the ship.
-        // player.rotation.y = Math.PI; // To face -Z if designed pointing +Z
-
-        // If you want it to look like it's flying "into" the screen (like Space Harrier)
-        // this default orientation (prongs along +Z) is fine.
-
-        // For a top-down view, you'd typically orient your camera above.
-        // And the ship might be rotated to "face" the top of the screen.
-        // player.rotation.x = -Math.PI / 2; // If Z is forward, this makes Y "up" for the ship
-        // player.rotation.z = Math.PI; // If you want the cockpit at the "top"
+        scene.add(player);
     }
-
     // --- Stealth Ship Design ---
     function createStealthShip(materialOptions) {
         const stealthBlack = 0x222222; // Dark black for stealth
@@ -3060,6 +3322,9 @@
         // Always update web rotation, even when paused
         //updateWebRotation();
 
+        // Always update stars animation, even when paused or in menu
+        updateStars(deltaTime);
+
         // Update game state
         if (!isPaused) {
             update(deltaTime);
@@ -3067,6 +3332,29 @@
 
         // Render
         renderer.render(scene, camera);
+    }
+
+    // --- Update Stars Animation ---
+    function updateStars(deltaTime) {
+        for (let i = 0; i < stars.length; i++) {
+            const star = stars[i];
+
+            // Rotate stars slowly for subtle movement
+            star.rotation.y += star.userData.rotationSpeed * deltaTime;
+            star.rotation.x += star.userData.rotationSpeed * 0.7 * deltaTime;
+
+            // Make stars twinkle by changing opacity
+            const twinkle = Math.sin(star.userData.twinklePhase) * 0.3 + 0.7;
+            star.material.opacity = twinkle;
+            star.userData.twinklePhase += star.userData.twinkleSpeed * deltaTime;
+
+            // Slowly rotate all stars around the center for a subtle space movement effect
+            const rotationSpeed = 0.00005 * deltaTime;
+            const currentX = star.position.x;
+            const currentZ = star.position.z;
+            star.position.x = currentX * Math.cos(rotationSpeed) - currentZ * Math.sin(rotationSpeed);
+            star.position.z = currentZ * Math.cos(rotationSpeed) + currentX * Math.sin(rotationSpeed);
+        }
     }
 
     // --- Event Handlers ---
