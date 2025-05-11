@@ -41,10 +41,6 @@
             padding: 0 20px;
         }
 
-        .hidden {
-            display: none;
-        }
-
         .touch-button {
             width: 60px;
             height: 60px;
@@ -325,14 +321,6 @@
             box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
         }
 
-        .toggle-button.off {
-            background-color: rgba(255, 0, 0, 0.2);
-            border: 2px solid rgba(255, 0, 0, 0.5);
-            color: #ff0000;
-            text-shadow: 0 0 5px #ff0000;
-            box-shadow: 0 0 10px rgba(255, 0, 0, 0.3);
-        }
-
         #menu button:hover, #game-over button:hover, #level-complete button:hover {
             text-shadow: 0 0 15px #ffff00;
             box-shadow: 0 0 10px #ffff00;
@@ -410,22 +398,6 @@
             box-shadow: 0 0 10px #00ffff;
         }
 
-        .game-button {
-            position: fixed;
-            bottom: 10px;
-            background-color: rgba(0, 255, 255, 0.2);
-            border: 2px solid rgba(0, 255, 255, 0.5);
-            color: #00ffff;
-            text-shadow: 0 0 5px #00ffff;
-            box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
-            padding: 5px 15px;
-            border-radius: 20px;
-            font-size: 0.8em;
-            cursor: pointer;
-            z-index: 100;
-            font-family: 'Orbitron', 'Rajdhani', sans-serif;
-        }
-
         #instructions-button {
             left: calc(50% - 30px);
             transform: translateX(-50%);
@@ -472,7 +444,7 @@
 </div>
 
 <!--<div id="instructions-button" class="game-button">I</div>-->
-<div style="margin-left: -55px;" id="game-sound-toggle" class="ame-button oggle-button">S</div>
+<div style="margin-left: -55px;" id="game-sound-toggle">S</div>
 <!-- Mobile touch controls -->
 <div id="mobile-controls">
     <div style="display: flex; justify-content: space-between; width: 100%">
@@ -628,7 +600,7 @@
     // Game State
     let gameState = 'menu'; // 'menu', 'countdown', 'playing', 'paused', 'gameover', 'levelcomplete'
     let isPaused = false;
-    let countdownTime = 3; // 3 second countdown
+    let countdownTime = 3; // 3-second countdown
     let countdownStartTime = 0;
 
     // Sound State
@@ -637,11 +609,11 @@
 
     // Web Configuration
     let NUM_LANES = 16;
-    const WEB_DEPTH = 60;
-    const WEB_RADIUS = 8;
+    const WEB_DEPTH = 80;
+    const WEB_RADIUS = 7;
     let LANE_ANGLE_STEP = (Math.PI * 2) / NUM_LANES;
     let webType = 'circle';
-    let tubeWidth = 'medium'; // Options: 'wire', 'small', 'medium', 'large'
+    let tubeWidth = 'large'; // Options: 'wire', 'small', 'medium', 'large'
 
     // Fixed Z positions
     const PLAYER_Z = WEB_DEPTH / 2;
@@ -653,7 +625,6 @@
     const COLLISION_Z_TOLERANCE = 1.0;
     const POWER_UP_CHANCE = 0.15; // 15% chance of power-up spawn per enemy kill
     const POWER_UP_DURATION = 10000; // 10 seconds
-    const SPECIAL_ENEMY_CHANCE = 0.1; // 10% chance of special enemy
     const BOMB_POINTS = 3000;
     // Configurable Settings
     let playerLaneChangeRate = 6;
@@ -693,10 +664,6 @@
     const finalScoreUI = document.getElementById('final-score');
     const finalHighScoreUI = document.getElementById('final-high-score');
     const restartButton = document.getElementById('restart-button');
-    const levelCompleteScreen = document.getElementById('level-complete');
-    const levelScoreUI = document.getElementById('level-score');
-    const levelHighScoreUI = document.getElementById('level-high-score');
-    const nextLevelButton = document.getElementById('next-level-button');
     const menuElement = document.getElementById('menu');
     const speedSelect = document.getElementById('speed-select');
     const difficultySelect = document.getElementById('difficulty-select');
@@ -1012,7 +979,7 @@
                     lastTouchY = touchY;
                 });
 
-                renderer.domElement.addEventListener('touchend', function(e) {
+                renderer.domElement.addEventListener('touchend', function() {
                     // Reset swipe state
                     isSwiping = false;
                 });
@@ -1041,7 +1008,7 @@
 
             this.bomb = bombSound;
 
-            // Pre-load sounds
+            // Preload sounds
             this.fire.load();
             this.explode.load();
             this.powerUp.load();
@@ -1348,8 +1315,8 @@
                 break;
             case 'circle':
             default:
-                // Circle-like polygon with 16 sides
-                NUM_LANES = 16;
+                // Circle-like polygon with 10 sides
+                NUM_LANES = 10;
                 shape = createPolygonWeb(NUM_LANES);
                 break;
         }
@@ -1453,27 +1420,6 @@
         return shape;
     }
 
-    function createSquareWeb() {
-        const shape = new THREE.Shape();
-        const size = WEB_RADIUS * 1.5;
-        shape.moveTo(size, size);
-        shape.lineTo(-size, size);
-        shape.lineTo(-size, -size);
-        shape.lineTo(size, -size);
-        shape.lineTo(size, size);
-        return shape;
-    }
-
-    function createTriangleWeb() {
-        const shape = new THREE.Shape();
-        const size = WEB_RADIUS * 1.8;
-        shape.moveTo(0, size);
-        shape.lineTo(-size, -size / 2);
-        shape.lineTo(size, -size / 2);
-        shape.lineTo(0, size);
-        return shape;
-    }
-
     // --- Create Player with enhanced visuals ---
     function createPlayer() {
         // Remove existing player if any
@@ -1530,7 +1476,7 @@
 
     // --- Classic Ship Design ---
     function createClassicShip() {
-// Remove existing player if any
+    // Remove existing player if any
         if (player) {
             scene.remove(player);
             player.traverse(child => {
@@ -1560,11 +1506,11 @@
         const decalColor = 0xffdd33;     // Brighter decal
 
         const mainMetalMaterial = new THREE.MeshStandardMaterial({
-            color: primaryMetalColor, metalness: 0.95, roughness: 0.30, // Slightly more reflective/less rough
+            color: primaryMetalColor, metalness: 0.05, roughness: 0.30, // Slightly more reflective/less rough
             envMapIntensity: 1.0 // Maximize environment reflection for contrast
         });
         const darkMetalMaterial = new THREE.MeshStandardMaterial({
-            color: secondaryMetalColor, metalness: 0.85, roughness: 0.50,
+            color: secondaryMetalColor, metalness: 0.05, roughness: 0.50,
             envMapIntensity: 0.9
         });
         const accentEmissiveMaterial = new THREE.MeshStandardMaterial({
@@ -1942,7 +1888,7 @@
     }
 
     // --- Racer Ship Design ---
-    function createRacerShip(materialOptions) {
+    function createRacerShip() {
         const bodyMat = new THREE.MeshStandardMaterial({
             color: 0x0077FF, // Bright Blue
             metalness: 0.6,
@@ -2042,7 +1988,7 @@
     }
 
     // --- Alien Ship Design ---
-    function createAlienShip(materialOptions) {
+    function createAlienShip() {
         const bodyMat = new THREE.MeshStandardMaterial({
             color: 0x33AA33, // Organic Green
             metalness: 0.2,
@@ -2112,7 +2058,7 @@
     }
 
     // --- Crystal Ship Design ---
-    function createCrystalShip(materialOptions) {
+    function createCrystalShip() {
         const crystalBodyMat = new THREE.MeshPhongMaterial({ // Phong for sharp highlights
             color: 0x87CEFA, // Light Sky Blue
             specular: 0xFFFFFF,
@@ -2306,10 +2252,8 @@
         const selectedWebType = webTypeSelect.value;
         const selectedTubeWidth = tubeWidthSelect.value;
         const selectedLives = livesSelect.value;
-        const selectedShipType = shipSelect.value;
-
         // Update global ship type
-        shipType = selectedShipType;
+        shipType = shipSelect.value;
 
         setGameSettings(selectedSpeed, selectedDifficulty, selectedWebType, selectedTubeWidth, selectedLives);
 
@@ -2417,7 +2361,7 @@
     }
 
     // --- Update Countdown Function ---
-    function updateCountdown(deltaTime) {
+    function updateCountdown() {
         if (gameState !== 'countdown') return;
 
         const currentTime = performance.now();
@@ -2611,28 +2555,71 @@
     }
 
     // --- Create Enemy ---
-    function createEnemy(isSpecial = false) {
+    function createEnemy(enemyType = 'regular') {
         if (gameState !== 'playing' || isPaused) return;
 
-        // Geometry based on enemy type
-        const enemyGeometry = isSpecial ?
-          new THREE.OctahedronGeometry(1.2) :
-          new THREE.TetrahedronGeometry(1);
+        let enemyGeometry, enemyMaterial;
+        let initialScale = 1.0;
+        let points = 100;
 
-        // Material based on enemy type
-        const enemyMaterial = isSpecial ?
-          new THREE.MeshPhongMaterial({
-              color: 0xff0000,
-              emissive: 0x880000,
-              emissiveIntensity: 0.5,
-              shininess: 30
-          }) :
-          new THREE.MeshPhongMaterial({
-              color: 0x00ff00,
-              emissive: 0x008800,
-              emissiveIntensity: 0.3,
-              shininess: 20
-          });
+        // Geometry and material based on enemy type
+        switch(enemyType) {
+            case 'special':
+                // Special enemy (red torus knot)
+                enemyGeometry = new THREE.TorusKnotGeometry(1.2);
+                enemyMaterial = new THREE.MeshPhongMaterial({
+                    color: 0xff0000,
+                    emissive: 0x880000,
+                    emissiveIntensity: 0.5,
+                    shininess: 30
+                });
+                initialScale = 1.2;
+                points = 200;
+                break;
+            case 'slow':
+                // Very slow enemy (blue cube)
+                enemyGeometry = new THREE.BoxGeometry(1.5, 1.5, 1.5);
+                enemyMaterial = new THREE.MeshPhongMaterial({
+                    color: 0x0000ff,
+                    emissive: 0x000088,
+                    emissiveIntensity: 0.4,
+                    shininess: 25
+                });
+                points = 150;
+                break;
+            case 'splitting':
+                // Splitting enemy (purple octahedron)
+                enemyGeometry = new THREE.OctahedronGeometry(1.2);
+                enemyMaterial = new THREE.MeshPhongMaterial({
+                    color: 0x8800ff,
+                    emissive: 0x440088,
+                    emissiveIntensity: 0.4,
+                    shininess: 25
+                });
+                points = 250;
+                break;
+            case 'bomber':
+                // Bomb-dropping enemy (orange dodecahedron)
+                enemyGeometry = new THREE.DodecahedronGeometry(1.2);
+                enemyMaterial = new THREE.MeshPhongMaterial({
+                    color: 0xff8800,
+                    emissive: 0x884400,
+                    emissiveIntensity: 0.4,
+                    shininess: 25
+                });
+                points = 300;
+                break;
+            default:
+                // Regular enemy (green torus)
+                enemyGeometry = new THREE.TorusGeometry(1);
+                enemyMaterial = new THREE.MeshPhongMaterial({
+                    color: 0x00ff00,
+                    emissive: 0x008800,
+                    emissiveIntensity: 0.3,
+                    shininess: 20
+                });
+                break;
+        }
 
         const enemy = new THREE.Mesh(enemyGeometry, enemyMaterial);
 
@@ -2677,13 +2664,13 @@
         }
 
         // Add pulsating animation
-        enemy.initialScale = isSpecial ? 1.2 : 1.0;
+        enemy.initialScale = initialScale;
         enemy.pulsePhase = Math.random() * Math.PI * 2; // Random starting phase
 
         // Store enemy properties
         enemy.laneIndex = laneIndex;
-        enemy.isSpecial = isSpecial;
-        enemy.points = isSpecial ? 200 : 100;
+        enemy.enemyType = enemyType;
+        enemy.points = points;
 
         // Store direction vector for movement (accounting for tunnel rotation)
         const direction = new THREE.Vector3(0, 0, 1);
@@ -2703,6 +2690,8 @@
 
         scene.add(enemy);
         enemies.push(enemy);
+
+        return enemy;
     }
 
     // --- Create Power-Up ---
@@ -2713,23 +2702,23 @@
         // Create power-up object
         const powerGeometry = new THREE.SphereGeometry(0.8, 8, 8);
 
-        // Color based on power-up type
+        // Color based on power-up type - using bright, distinct colors
         let powerColor;
         switch (powerType) {
             case 'rapidFire':
-                powerColor = 0xffaa00;
-                break; // Orange
+                powerColor = 0xFFD700;
+                break; // Gold
             case 'extraLife':
-                powerColor = 0xff0000;
-                break; // Red
+                powerColor = 0x00FFAA;
+                break; // Bright Teal
             case 'shield':
-                powerColor = 0x0088ff;
-                break; // Blue
+                powerColor = 0x00DDFF;
+                break; // Bright Cyan
             case 'superProjectile':
-                powerColor = 0xff00ff;
-                break; // Magenta
+                powerColor = 0xFF00CC;
+                break; // Hot Pink
             default:
-                powerColor = 0xffffff; // White
+                powerColor = 0xFFFFFF; // White
         }
 
         const powerMaterial = new THREE.MeshPhongMaterial({
@@ -2943,7 +2932,7 @@
                 }, 500);
             }
 
-            // Remove projectile if off screen
+            // Remove projectile if offscreen
             if (projectile.position.z < ENEMY_START_Z - 5) {
                 scene.remove(projectile);
                 projectiles.splice(i, 1);
@@ -2955,9 +2944,28 @@
 
         // Spawn enemies until we've reached the level's required number
         if (enemySpawnTimer >= currentEnemySpawnInterval && enemies.length < enemiesRequired - enemiesKilled) {
-            // Chance to spawn special enemy
-            const isSpecial = Math.random() < SPECIAL_ENEMY_CHANCE;
-            createEnemy(isSpecial);
+            // Determine enemy type to spawn
+            const randomValue = Math.random();
+            let enemyType;
+
+            if (randomValue < 0.05) {
+                // 5% chance for slow enemy
+                enemyType = 'slow';
+            } else if (randomValue < 0.10) {
+                // 5% chance for splitting enemy
+                enemyType = 'splitting';
+            } else if (randomValue < 0.15) {
+                // 5% chance for bomber enemy
+                enemyType = 'bomber';
+            } else if (randomValue < 0.25) {
+                // 10% chance for special enemy
+                enemyType = 'special';
+            } else {
+                // 75% chance for regular enemy
+                enemyType = 'regular';
+            }
+
+            createEnemy(enemyType);
             enemySpawnTimer = 0;
         }
 
@@ -2965,7 +2973,28 @@
             const enemy = enemies[i];
 
             // Move enemy along its direction vector (accounting for tunnel rotation)
-            const speed = currentEnemySpeed * (enemy.isSpecial ? 1.5 : 1.0);
+            let speedMultiplier;
+
+            // Set speed multiplier based on enemy type
+            switch(enemy.enemyType) {
+                case 'special':
+                    speedMultiplier = 1.5; // Special enemies are faster
+                    break;
+                case 'slow':
+                    speedMultiplier = 0.3; // Slow enemies are very slow
+                    break;
+                case 'splitting':
+                    speedMultiplier = 1.2; // Splitting enemies are slightly faster
+                    break;
+                case 'bomber':
+                    speedMultiplier = 0.8; // Bomber enemies are slightly slower
+                    break;
+                default:
+                    speedMultiplier = 1.0; // Regular enemies have normal speed
+            }
+
+            const speed = currentEnemySpeed * speedMultiplier;
+
             if (enemy.direction) {
                 enemy.position.x += enemy.direction.x * speed;
                 enemy.position.y += enemy.direction.y * speed;
@@ -2980,10 +3009,21 @@
             enemy.pulsePhase += 0.05;
             enemy.scale.set(pulseScale, pulseScale, pulseScale);
 
-            // Special enemies also rotate
-            if (enemy.isSpecial) {
-                enemy.rotation.y += 0.03;
-                enemy.rotation.x += 0.02;
+            // Special rotation effects based on enemy type
+            switch(enemy.enemyType) {
+                case 'special':
+                    enemy.rotation.y += 0.03;
+                    enemy.rotation.x += 0.02;
+                    break;
+                case 'splitting':
+                    enemy.rotation.z += 0.04;
+                    break;
+                case 'bomber':
+                    enemy.rotation.x += 0.03;
+                    break;
+                case 'slow':
+                    enemy.rotation.y += 0.01;
+                    break;
             }
 
             // Check if enemy reached the player's end
@@ -3100,11 +3140,76 @@
                     enemiesKilled++;
                     updateEnemiesRemainingUI();
 
-                    // Create explosion effect
-                    createExplosion(enemy.position, enemy.isSpecial ? 0xff0000 : 0x00ff00);
+                    // Get enemy color for explosion effect
+                    let explosionColor;
+                    switch(enemy.enemyType) {
+                        case 'special':
+                            explosionColor = 0xff0000; // Red
+                            break;
+                        case 'slow':
+                            explosionColor = 0x0000ff; // Blue
+                            break;
+                        case 'splitting':
+                            explosionColor = 0x8800ff; // Purple
+                            break;
+                        case 'bomber':
+                            explosionColor = 0xff8800; // Orange
+                            break;
+                        default:
+                            explosionColor = 0x00ff00; // Green
+                    }
 
-                    // Chance to spawn power-up
-                    if (Math.random() < POWER_UP_CHANCE || enemy.isSpecial) {
+                    // Create explosion effect
+                    createExplosion(enemy.position, explosionColor);
+
+                    // Special behavior for splitting enemy
+                    if (enemy.enemyType === 'splitting') {
+                        // Create two smaller enemies
+                        for (let k = 0; k < 2; k++) {
+                            // Only spawn new enemies if we haven't reached the enemy limit
+                            if (enemies.length < enemiesRequired - enemiesKilled + 5) {
+                                const newEnemy = createEnemy('regular');
+
+                                // Position the new enemy at the destroyed enemy's position
+                                newEnemy.position.copy(enemy.position);
+
+                                // Slightly offset the position
+                                newEnemy.position.x += (k === 0 ? 0.5 : -0.5);
+                                newEnemy.position.y += (k === 0 ? 0.5 : -0.5);
+
+                                // Make the new enemy smaller
+                                newEnemy.scale.set(0.7, 0.7, 0.7);
+                                newEnemy.initialScale = 0.7;
+
+                                // Reduce points for the smaller enemies
+                                newEnemy.points = 50;
+                            }
+                        }
+
+                        // Show message
+                        //showMessage("ENEMY SPLIT!", 0x8800ff);
+                    }
+
+                    // Special behavior for bomber enemy
+                    if (enemy.enemyType === 'bomber') {
+                        // Always drop a bomb powerup
+                        const bombPowerUp = createPowerUp(enemy.position);
+
+                        // Force it to be a bomb
+                        if (bombPowerUp) {
+                            // Add a bomb to the player's inventory
+                            bombs++;
+                            updateBombsUI();
+
+                            // Show message
+                            showMessage("BOMB ACQUIRED!", 0xff8800);
+
+                            // Play power-up sound
+                            sounds.play('powerUp');
+                        }
+                    }
+                    // Normal chance to spawn power-up for other enemy types
+                    else if (Math.random() < POWER_UP_CHANCE || enemy.enemyType === 'special') {
                         createPowerUp(enemy.position);
                     }
 
@@ -3259,8 +3364,8 @@
         messageDiv.style.top = '50%';
         messageDiv.style.left = '50%';
         messageDiv.style.transform = 'translate(-50%, -50%)';
-        messageDiv.style.color = '#' + color.toString(16);
-        messageDiv.style.textShadow = '0 0 10px #' + color.toString(16);
+        messageDiv.style.color = '#' + color.toString();
+        messageDiv.style.textShadow = '0 0 10px #' + color.toString();
         messageDiv.style.fontSize = '2em';
         messageDiv.style.fontFamily = "Orbitron, sans-serif";
         messageDiv.style.zIndex = '1000';
@@ -3368,8 +3473,7 @@
             star.rotation.x += star.userData.rotationSpeed * 0.7 * deltaTime;
 
             // Make stars twinkle by changing opacity
-            const twinkle = Math.sin(star.userData.twinklePhase) * 0.3 + 0.7;
-            star.material.opacity = twinkle;
+            star.material.opacity = Math.sin(star.userData.twinklePhase) * 0.3 + 0.7;
             star.userData.twinklePhase += star.userData.twinkleSpeed * deltaTime;
 
             // Slowly rotate all stars around the center for a subtle space movement effect
@@ -3431,7 +3535,7 @@
         keyState[event.key] = false;
     }
 
-    function onMouseClick(event) {
+    function onMouseClick() {
         // Allow toggling rotation if game is playing, even when paused
         if (gameState === 'playing') {
             // Toggle rotation enabled flag
