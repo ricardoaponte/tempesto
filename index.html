@@ -452,8 +452,8 @@
     <div>
         <label for="speed-select">PLAYER SPEED:</label>
         <select id="speed-select">
-            <option value="slow">SLOW</option>
-            <option value="normal" selected>NORMAL</option>
+            <option value="slow" selected>SLOW</option>
+            <option value="normal">NORMAL</option>
             <option value="fast">FAST</option>
         </select>
     </div>
@@ -537,6 +537,7 @@
     const powerUps = [];
     const explosions = [];
     const keyState = {};
+    let difficulty = 'medium'; // Default difficulty
 
 
     // Mouse tracking variables
@@ -1007,7 +1008,8 @@
         if (levelIndicatorElement) levelIndicatorElement.style.display = 'none';
 
         if (gameOverScreen) gameOverScreen.style.display = 'none';
-        if (levelCompleteScreen) levelCompleteScreen.style.display = 'none';
+        // We don't need to hide the level complete screen anymore as it's not shown
+        // if (levelCompleteScreen) levelCompleteScreen.style.display = 'none';
         if (menuElement) menuElement.style.display = 'block';
 
         const instructionsButton = document.getElementById('instructions-button');
@@ -1036,7 +1038,8 @@
         // Button listeners
         if (startButton) startButton.addEventListener('click', startGame);
         if (restartButton) restartButton.addEventListener('click', restartGame);
-        if (nextLevelButton) nextLevelButton.addEventListener('click', nextLevel);
+        // We don't need the next level button anymore as levels continue automatically
+        // if (nextLevelButton) nextLevelButton.addEventListener('click', nextLevel);
 
 
         // Start the animation loop
@@ -1443,7 +1446,7 @@
     }
 
     // --- Set Game Settings ---
-    function setGameSettings(speed, difficulty, web, width, lives) {
+    function setGameSettings(speed, difficultyParam, web, width, lives) {
         // Player Speed
         switch (speed) {
             case 'slow':
@@ -1459,8 +1462,11 @@
                 playerLaneChangeRate = 6;
         }
 
+        // Store the difficulty in the global variable
+        difficulty = difficultyParam;
+
         // Difficulty
-        switch (difficulty) {
+        switch (difficultyParam) {
             case 'easy':
                 currentEnemySpeed = 0.03;
                 currentEnemySpawnInterval = 80;
@@ -1554,7 +1560,8 @@
         document.getElementById('power-ups').style.display = 'block';
         document.getElementById('level-indicator').style.display = 'block';
         gameOverScreen.style.display = 'none';
-        levelCompleteScreen.style.display = 'none';
+        // We don't need to hide the level complete screen anymore as it's not shown
+        // levelCompleteScreen.style.display = 'none';
         menuElement.style.display = 'none';
 
         // Mobile device detection and touch controls setup
@@ -1582,7 +1589,25 @@
         // Increase difficulty
         currentEnemySpeed += 0.01;
         currentEnemySpawnInterval = Math.max(currentEnemySpawnInterval - 5, 20);
-        enemiesRequired = Math.min(enemiesPerLevel + (level * 5), 50);
+
+        // Scale number of enemies based on difficulty level and current level
+        let difficultyMultiplier;
+        switch (difficulty) {
+            case 'easy':
+                difficultyMultiplier = 1.0;
+                break;
+            case 'medium':
+                difficultyMultiplier = 1.5;
+                break;
+            case 'hard':
+                difficultyMultiplier = 2.0;
+                break;
+            default:
+                difficultyMultiplier = 1.5;
+        }
+
+        // Calculate enemies required based on base amount, level, and difficulty
+        enemiesRequired = Math.min(Math.floor(enemiesPerLevel + (level * 5 * difficultyMultiplier)), 100);
 
         // Reset level-specific variables
         enemiesKilled = 0;
@@ -1608,8 +1633,8 @@
         updateEnemiesRemainingUI();
         updateBombsUI();
 
-        // Hide level complete screen
-        levelCompleteScreen.style.display = 'none';
+        // We don't need to hide the level complete screen anymore as it's not shown
+        // levelCompleteScreen.style.display = 'none';
 
         // Resume game
         gameState = 'playing';
@@ -2300,9 +2325,6 @@
         saveRotationState();
 
         gameState = 'levelcomplete';
-        levelScoreUI.textContent = 'LEVEL ' + level + ' SCORE: ' + score;
-        levelHighScoreUI.textContent = 'HIGH SCORE: ' + highScore;
-        levelCompleteScreen.style.display = 'block';
 
         // Bonus points for completing level
         const levelBonus = level * 500;
@@ -2317,9 +2339,11 @@
             activePowerUp = null;
         }
 
-        // Hide player
-        player.visible = false;
+        // Show level up message
+        showMessage("LEVEL " + level + " COMPLETE!", 0x00ffff);
 
+        // Automatically continue to next level after a short delay
+        setTimeout(nextLevel, 2000);
     }
 
     // --- UI Updates ---
