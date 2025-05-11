@@ -523,8 +523,6 @@
         <label for="web-type-select">WEB TYPE:</label>
         <select id="web-type-select">
             <option value="circle">CIRCLE</option>
-            <option value="square">SQUARE</option>
-            <option value="triangle">TRIANGLE</option>
             <option value="pentagon">PENTAGON</option>
             <option value="hexagon">HEXAGON</option>
             <option value="octagon">OCTAGON</option>
@@ -1262,14 +1260,6 @@
         webType = type;
 
         switch (type) {
-            case 'square':
-                shape = createSquareWeb();
-                NUM_LANES = 4; // 4 sides
-                break;
-            case 'triangle':
-                shape = createTriangleWeb();
-                NUM_LANES = 3; // 3 sides
-                break;
             case 'pentagon':
                 NUM_LANES = 5; // 5 sides
                 shape = createPolygonWeb(NUM_LANES);
@@ -2005,48 +1995,10 @@
         let x, y;
         let angle;
 
-        if (webType === 'square') {
-            // For square web, place player at the midpoint of each side
-            switch (playerCurrentLaneIndex) {
-                case 0: // Top
-                    x = 0;
-                    y = WEB_RADIUS * 1.5;
-                    break;
-                case 1: // Left
-                    x = -WEB_RADIUS * 1.5;
-                    y = 0;
-                    break;
-                case 2: // Bottom
-                    x = 0;
-                    y = -WEB_RADIUS * 1.5;
-                    break;
-                case 3: // Right
-                    x = WEB_RADIUS * 1.5;
-                    y = 0;
-                    break;
-            }
-            // Rotation to face inward
-            angle = (playerCurrentLaneIndex * Math.PI / 2) + Math.PI / 2;
-        } else if (webType === 'triangle') {
-            // For triangle web, position at the three corners
-            angle = (playerCurrentLaneIndex * Math.PI * 2 / 3);
-            const size = WEB_RADIUS * 1.8;
-            if (playerCurrentLaneIndex === 0) {
-                x = 0;
-                y = size;
-            } else if (playerCurrentLaneIndex === 1) {
-                x = -size;
-                y = -size / 2;
-            } else {
-                x = size;
-                y = -size / 2;
-            }
-        } else {
-            // For circle or random polygon
-            angle = playerCurrentLaneIndex * LANE_ANGLE_STEP;
-            x = WEB_RADIUS * Math.cos(angle);
-            y = WEB_RADIUS * Math.sin(angle);
-        }
+        // For circle or random polygon
+        angle = playerCurrentLaneIndex * LANE_ANGLE_STEP;
+        x = WEB_RADIUS * Math.cos(angle);
+        y = WEB_RADIUS * Math.sin(angle);
 
         // Create a position vector
         const position = new THREE.Vector3(x, y, PLAYER_Z);
@@ -2260,7 +2212,7 @@
         saveRotationState();
 
         // Choose a new random web shape for variety
-        const webTypes = ['circle', 'square', 'triangle', 'pentagon', 'hexagon', 'octagon', 'random'];
+        const webTypes = ['circle', 'pentagon', 'hexagon', 'octagon', 'random'];
         const newWebType = webTypes[Math.floor(Math.random() * webTypes.length)];
         createWeb(newWebType);
 
