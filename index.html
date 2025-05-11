@@ -1783,9 +1783,6 @@
         document.getElementById('power-ups').style.display = 'none';
         document.getElementById('level-indicator').style.display = 'none';
 
-        // Clear AI auto-restart countdown if active
-        clearAIRestartCountdown();
-
         player.visible = false;
         clearGameObjects();
     }
@@ -2724,10 +2721,9 @@
         const selectedWebType = webTypeSelect.value;
         const selectedTubeWidth = tubeWidthSelect.value;
         const selectedLives = livesSelect.value;
-        const selectedAIPlayer = aiPlayerSelect.value;
 
         // Apply settings
-        setGameSettings(selectedSpeed, selectedDifficulty, selectedWebType, selectedTubeWidth, selectedLives, selectedAIPlayer);
+        setGameSettings(selectedSpeed, selectedDifficulty, selectedWebType, selectedTubeWidth, selectedLives);
 
         // Recreate the web if the web type has changed
         if (webType !== selectedWebType) {
