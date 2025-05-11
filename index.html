@@ -41,6 +41,10 @@
             padding: 0 20px;
         }
 
+        .hidden {
+            display: none;
+        }
+
         .touch-button {
             width: 60px;
             height: 60px;
@@ -311,6 +315,24 @@
             margin-top: 10px;
         }
 
+        .toggle-button {
+            width: 60px !important;
+            text-align: center;
+            background-color: rgba(0, 255, 0, 0.2);
+            border: 2px solid rgba(0, 255, 0, 0.5);
+            color: #00ff00;
+            text-shadow: 0 0 5px #00ff00;
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
+        }
+
+        .toggle-button.off {
+            background-color: rgba(255, 0, 0, 0.2);
+            border: 2px solid rgba(255, 0, 0, 0.5);
+            color: #ff0000;
+            text-shadow: 0 0 5px #ff0000;
+            box-shadow: 0 0 10px rgba(255, 0, 0, 0.3);
+        }
+
         #menu button:hover, #game-over button:hover, #level-complete button:hover {
             text-shadow: 0 0 15px #ffff00;
             box-shadow: 0 0 10px #ffff00;
@@ -388,11 +410,9 @@
             box-shadow: 0 0 10px #00ffff;
         }
 
-        #instructions-button {
+        .game-button {
             position: fixed;
             bottom: 10px;
-            left: 50%;
-            transform: translateX(-50%);
             background-color: rgba(0, 255, 255, 0.2);
             border: 2px solid rgba(0, 255, 255, 0.5);
             color: #00ffff;
@@ -404,6 +424,39 @@
             cursor: pointer;
             z-index: 100;
             font-family: 'Orbitron', 'Rajdhani', sans-serif;
+        }
+
+        #instructions-button {
+            left: calc(50% - 30px);
+            transform: translateX(-50%);
+        }
+
+        #game-sound-toggle {
+            left: calc(50% + 30px);
+            transform: translateX(-50%);
+        }
+
+        /* Mobile styles for game buttons */
+        @media (max-width: 800px), (max-height: 600px) {
+            #instructions-button {
+                padding: 5px 10px;
+                width: 30px;
+                height: 30px;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                border-radius: 50%;
+            }
+
+            #game-sound-toggle {
+                padding: 5px 10px;
+                width: 30px;
+                height: 30px;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                border-radius: 50%;
+            }
         }
     </style>
 </head>
@@ -418,7 +471,8 @@
     <button id="close-instructions-button">CLOSE</button>
 </div>
 
-<div id="instructions-button">INSTRUCTIONS</div>
+<!--<div id="instructions-button" class="game-button">I</div>-->
+<div style="margin-left: -55px;" id="game-sound-toggle" class="ame-button oggle-button">S</div>
 <!-- Mobile touch controls -->
 <div id="mobile-controls">
     <div style="display: flex; justify-content: space-between; width: 100%">
@@ -468,25 +522,25 @@
     <div>
         <label for="web-type-select">WEB TYPE:</label>
         <select id="web-type-select">
-            <option value="circle" selected>CIRCLE</option>
+            <option value="circle">CIRCLE</option>
             <option value="square">SQUARE</option>
             <option value="triangle">TRIANGLE</option>
             <option value="pentagon">PENTAGON</option>
             <option value="hexagon">HEXAGON</option>
             <option value="octagon">OCTAGON</option>
-            <option value="random">RANDOM</option>
+            <option value="random" selected>RANDOM</option>
         </select>
     </div>
-    <div>
+    <div style="display: none !important;">
         <label for="tube-width-select">TUBE WIDTH:</label>
         <select id="tube-width-select">
             <option value="wire">WIRE</option>
             <option value="small">SMALL</option>
-            <option value="medium" selected>MEDIUM</option>
-            <option value="large">LARGE</option>
+            <option value="medium">MEDIUM</option>
+            <option value="large" selected>LARGE</option>
         </select>
     </div>
-    <div>
+    <div style="display: none !important;">
         <label for="lives-select">LIVES:</label>
         <select id="lives-select">
             <option value="3" selected>3</option>
@@ -498,6 +552,10 @@
             <option value="500">500</option>
             <option value="1000">1000</option>
         </select>
+    </div>
+    <div>
+        <label for="sound-toggle">SOUND:</label>
+        <button id="sound-toggle" class="toggle-button">ON</button>
     </div>
     <button id="start-button">START GAME</button>
 </div>
@@ -550,6 +608,7 @@
     const STORAGE_KEY_ROTATION_Y = 'tempest3d_rotationY';
     const STORAGE_KEY_ROTATION_ENABLED = 'tempest3d_rotationEnabled';
     const STORAGE_KEY_HIGH_SCORE = 'tempest3d_highScore';
+    const STORAGE_KEY_SOUND_ENABLED = 'tempest3d_soundEnabled';
 
     // Debounce timer for saving rotation state
     let saveRotationTimer = null;
@@ -557,6 +616,9 @@
     // Game State
     let gameState = 'menu'; // 'menu', 'playing', 'paused', 'gameover', 'levelcomplete'
     let isPaused = false;
+
+    // Sound State
+    let isSoundEnabled = true; // Default to sound on
 
 
     // Web Configuration
@@ -660,6 +722,59 @@
             }
         } catch (e) {
             console.error("Failed to load high score from localStorage:", e);
+        }
+    }
+
+    // --- Save and Load Sound State ---
+    function saveSoundState() {
+        try {
+            localStorage.setItem(STORAGE_KEY_SOUND_ENABLED, isSoundEnabled);
+        } catch (e) {
+            console.error("Failed to save sound state to localStorage:", e);
+        }
+    }
+
+    function loadSoundState() {
+        try {
+            const savedSoundState = localStorage.getItem(STORAGE_KEY_SOUND_ENABLED);
+            if (savedSoundState !== null) {
+                isSoundEnabled = savedSoundState === 'true';
+                updateSoundToggleButton();
+            }
+        } catch (e) {
+            console.error("Failed to load sound state from localStorage:", e);
+        }
+    }
+
+    // --- Toggle Sound ---
+    function toggleSound() {
+        isSoundEnabled = !isSoundEnabled;
+        updateSoundToggleButton();
+        saveSoundState();
+    }
+
+    // --- Update Sound Toggle Buttons ---
+    function updateSoundToggleButton() {
+        // Update menu sound toggle button
+        const soundToggleButton = document.getElementById('sound-toggle');
+        if (soundToggleButton) {
+            soundToggleButton.textContent = isSoundEnabled ? 'ON' : 'OFF';
+            if (isSoundEnabled) {
+                soundToggleButton.classList.remove('off');
+            } else {
+                soundToggleButton.classList.add('off');
+            }
+        }
+
+        // Update in-game sound toggle button
+        const gameSoundToggleButton = document.getElementById('game-sound-toggle');
+        if (gameSoundToggleButton) {
+            gameSoundToggleButton.textContent = isSoundEnabled ? 'ON' : 'OFF';
+            if (isSoundEnabled) {
+                gameSoundToggleButton.classList.remove('off');
+            } else {
+                gameSoundToggleButton.classList.add('off');
+            }
         }
     }
 
@@ -934,6 +1049,11 @@
 
         // Play a sound with error handling
         play: function(sound) {
+            // If sounds are disabled, don't play anything
+            if (!isSoundEnabled) {
+                return;
+            }
+
             // If not initialized, try to initialize first
             if (!this.initialized) {
                 this.initializeAudio();
@@ -965,6 +1085,9 @@
     function init() {
         // Load high score
         loadHighScore();
+
+        // Load sound state
+        loadSoundState();
 
         // Initialize sounds
         sounds.init();
@@ -1040,6 +1163,13 @@
         if (restartButton) restartButton.addEventListener('click', restartGame);
         // We don't need the next level button anymore as levels continue automatically
         // if (nextLevelButton) nextLevelButton.addEventListener('click', nextLevel);
+
+        // Sound toggle buttons listeners
+        const soundToggleButton = document.getElementById('sound-toggle');
+        const gameSoundToggleButton = document.getElementById('game-sound-toggle');
+
+        if (soundToggleButton) soundToggleButton.addEventListener('click', toggleSound);
+        if (gameSoundToggleButton) gameSoundToggleButton.addEventListener('click', toggleSound);
 
 
         // Start the animation loop
