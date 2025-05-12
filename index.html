@@ -3165,6 +3165,7 @@
                     // Special behavior for splitting enemy
                     if (enemy.enemyType === 'splitting') {
                         // Create two smaller enemies
+                        let newEnemiesCreated = 0;
                         for (let k = 0; k < 2; k++) {
                             // Only spawn new enemies if we haven't reached the enemy limit
                             if (enemies.length < enemiesRequired - enemiesKilled + 5) {
@@ -3183,8 +3184,15 @@
 
                                 // Reduce points for the smaller enemies
                                 newEnemy.points = 50;
+
+                                // Count new enemies created
+                                newEnemiesCreated++;
                             }
                         }
+
+                        // Update enemiesRequired to account for the new enemies
+                        enemiesRequired += newEnemiesCreated;
+                        updateEnemiesRemainingUI();
 
                         // Show message
                         //showMessage("ENEMY SPLIT!", 0x8800ff);
