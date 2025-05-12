@@ -580,6 +580,10 @@
     const NUM_STARS = 200; // Number of background stars
     const keyState = {};
     let difficulty = 'medium'; // Default difficulty
+
+    // Web color variables
+    let webColorHue = 180; // Starting with cyan (180 degrees in HSL)
+    const webColorSpeed = 0.1; // Speed of color change
     let shipType = 'classic'; // Default ship type
 
 
@@ -610,8 +614,8 @@
 
     // Web Configuration
     let NUM_LANES = 16;
-    const WEB_DEPTH = 80;
-    const WEB_RADIUS = 7;
+    const WEB_DEPTH = 160;
+    const WEB_RADIUS = 9;
     let LANE_ANGLE_STEP = (Math.PI * 2) / NUM_LANES;
     let webType = 'circle';
     let tubeWidth = 'large'; // Options: 'wire', 'small', 'medium', 'large'
@@ -735,6 +739,13 @@
         isSoundEnabled = !isSoundEnabled;
         updateSoundToggleButton();
         saveSoundState();
+    }
+
+    // --- Update Start Button Text ---
+    function updateStartButtonText() {
+        if (startButton) {
+            startButton.textContent = (gameState === 'playing' && isPaused) ? 'RESUME GAME' : 'START GAME';
+        }
     }
 
     // --- Update Sound Toggle Buttons ---
@@ -874,6 +885,7 @@
                             isPaused = !isPaused;
                             pauseScreen.style.display = isPaused ? 'block' : 'none';
                             menuElement.style.display = isPaused ? 'block' : 'none';
+                            updateStartButtonText();
 
                             if (!isPaused) {
                                 // Apply settings when resuming
@@ -1386,9 +1398,13 @@
             );
 
             // Create material with glow effect
+            // Use current color from our color-changing mechanism
+            const color = new THREE.Color().setHSL(webColorHue / 360, 1, 0.5);
+            const emissiveColor = new THREE.Color().setHSL(webColorHue / 360, 1, 0.3);
+
             const tubeMaterial = new THREE.MeshPhongMaterial({
-                color: 0x00ffff,
-                emissive: 0x00ffff,
+                color: color,
+                emissive: emissiveColor,
                 emissiveIntensity: 0.3,
                 transparent: true,
                 opacity: 0.8,
@@ -2244,6 +2260,16 @@
 
     // --- Start Game Function ---
     function startGame() {
+        // If the game is paused, resume it
+        if (gameState === 'playing' && isPaused) {
+            isPaused = false;
+            pauseScreen.style.display = 'none';
+            menuElement.style.display = 'none';
+            updateStartButtonText();
+            return;
+        }
+
+        // Otherwise, don't start a new game if already playing or in countdown
         if (gameState === 'playing' || gameState === 'countdown') return;
 
         // Initialize audio after user interaction
@@ -2408,7 +2434,7 @@
         updateLivesUI();
 
         // Increase difficulty
-        currentEnemySpeed += 0.01;
+        currentEnemySpeed += 0.001;
         currentEnemySpawnInterval = Math.max(currentEnemySpawnInterval - 5, 20);
 
         // Scale number of enemies based on difficulty level and current level
@@ -2876,11 +2902,34 @@
         sounds.play('powerUp');
     }
 
+    // --- Update Web Color ---
+    function updateWebColor(deltaTime) {
+        if (!webMesh) return;
+
+        // Update the hue value
+        webColorHue = (webColorHue + webColorSpeed * deltaTime) % 360;
+
+        // Convert HSL to hex color
+        const color = new THREE.Color().setHSL(webColorHue / 360, 1, 0.5);
+        const emissiveColor = new THREE.Color().setHSL(webColorHue / 360, 1, 0.3);
+
+        // Update all tube segments in the web
+        webMesh.children.forEach(tube => {
+            if (tube.material) {
+                tube.material.color.copy(color);
+                tube.material.emissive.copy(emissiveColor);
+            }
+        });
+    }
+
     // --- Update Game State (per frame) ---
     function update(deltaTime) {
         if (gameState !== 'playing' || isPaused) {
             return;
         }
+
+        // Update web color
+        updateWebColor(deltaTime);
 
         const currentFrame = renderer.info.render.frame;
 
@@ -3540,6 +3589,7 @@
                 isPaused = !isPaused;
                 pauseScreen.style.display = isPaused ? 'block' : 'none';
                 menuElement.style.display = isPaused ? 'block' : 'none';
+                updateStartButtonText();
 
                 if (!isPaused) {
                     // Apply settings when resuming
