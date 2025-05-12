@@ -58,7 +58,7 @@ class AudioWorkletManager {
       }
 
       // Load the audio processor worklet
-      await this.audioContext.audioWorklet.addModule('audio-processor.js');
+      await this.audioContext.audioWorklet.addModule('./src/audio-processor.js');
 
       // Create the worklet node
       this.workletNode = new AudioWorkletNode(this.audioContext, 'sound-processor');
