@@ -421,7 +421,8 @@ canvas {
     text-shadow: 0 0 5px #ffcc00;
     font-family: 'Orbitron', 'Rajdhani', sans-serif;
     font-size: 0.8em;
-    margin-top: 15px;
+    margin-top: 1px;
+    margin-left: 3px;
     width: 100%;
 }
 
