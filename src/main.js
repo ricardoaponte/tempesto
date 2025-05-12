@@ -878,7 +878,7 @@ function createWeb(type) {
                 tubeRadiusMultiplier = 0.002;
                 break; // 2% of web radius (default)
             case 'large':
-                tubeRadiusMultiplier = 0.004;
+                tubeRadiusMultiplier = 0.009;
                 break; // 4% of web radius
             default:
                 tubeRadiusMultiplier = 0.02; // Default to medium
