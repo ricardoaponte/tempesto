@@ -635,12 +635,12 @@ const sounds = {
 };
 
 // --- Initialization Function ---
-function init() {
+async function init() {
     // Load high score
     loadHighScore();
 
-    // Load leaderboard
-    loadLeaderboard();
+    // Load leaderboard (async)
+    await loadLeaderboard();
 
     // Load sound state
     loadSoundState();
@@ -3392,34 +3392,54 @@ function changeShipType(newShipType) {
 // --- Leaderboard Functions ---
 
 // Load leaderboard from localStorage
-function loadLeaderboard() {
+// Load leaderboard from API with localStorage fallback
+async function loadLeaderboard() {
     try {
-        const savedLeaderboard = localStorage.getItem(STORAGE_KEY_LEADERBOARD);
-        if (savedLeaderboard) {
-            leaderboard = JSON.parse(savedLeaderboard);
-        } else {
-            // Initialize with default values if no leaderboard exists
-            leaderboard = [
-                { initials: 'CPU', score: 5000 },
-                { initials: 'BOT', score: 4000 },
-                { initials: 'AI', score: 3000 },
-                { initials: 'PRO', score: 2000 },
-                { initials: 'MAX', score: 1000 }
-            ];
-            saveLeaderboard();
+        const response = await fetch('/api/leaderboard');
+        if (!response.ok) throw new Error('Failed to fetch leaderboard');
+
+        const data = await response.json();
+        leaderboard = data;
+
+        // Cache in localStorage as backup
+        try {
+            localStorage.setItem(STORAGE_KEY_LEADERBOARD, JSON.stringify(leaderboard));
+        } catch (storageError) {
+            console.error('Error saving to localStorage:', storageError);
         }
     } catch (e) {
-        console.error('Failed to load leaderboard:', e);
-        leaderboard = [];
+        console.error('Failed to load leaderboard from API:', e);
+
+        // Fall back to local storage if API is unavailable
+        try {
+            const savedLeaderboard = localStorage.getItem(STORAGE_KEY_LEADERBOARD);
+            if (savedLeaderboard) {
+                leaderboard = JSON.parse(savedLeaderboard);
+            } else {
+                // Initialize with default values if nothing exists
+                leaderboard = [
+                    { initials: 'CPU', score: 5000 },
+                    { initials: 'BOT', score: 4000 },
+                    { initials: 'AI', score: 3000 },
+                    { initials: 'PRO', score: 2000 },
+                    { initials: 'MAX', score: 1000 }
+                ];
+                // Save defaults to localStorage
+                localStorage.setItem(STORAGE_KEY_LEADERBOARD, JSON.stringify(leaderboard));
+            }
+        } catch (storageError) {
+            console.error('Error accessing localStorage:', storageError);
+            leaderboard = [];
+        }
     }
 }
 
-// Save leaderboard to localStorage
+// Save leaderboard to localStorage (used as a backup)
 function saveLeaderboard() {
     try {
         localStorage.setItem(STORAGE_KEY_LEADERBOARD, JSON.stringify(leaderboard));
     } catch (e) {
-        console.error('Failed to save leaderboard:', e);
+        console.error('Failed to save leaderboard to localStorage:', e);
     }
 }
 
@@ -3441,24 +3461,70 @@ function checkHighScore(currentScore) {
     return false;
 }
 
-// Add a new score to the leaderboard
-function addScoreToLeaderboard(initials, currentScore) {
-    // Insert the new score at the correct position
-    leaderboard.splice(newScoreRank, 0, {
-        initials: initials.toUpperCase().substring(0, 3),
-        score: currentScore
-    });
+// Add a new score to the leaderboard via API
+async function addScoreToLeaderboard(initials, currentScore) {
+    const formattedInitials = initials.toUpperCase().substring(0, 3);
 
-    // Keep only the top 10 scores
-    if (leaderboard.length > 10) {
-        leaderboard = leaderboard.slice(0, 10);
+    try {
+        const response = await fetch('/api/leaderboard', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                initials: formattedInitials,
+                score: currentScore
+            })
+        });
+
+        if (!response.ok) throw new Error('Failed to submit score');
+
+        const result = await response.json();
+
+        if (result.success) {
+            // Update local leaderboard with the one from the server
+            leaderboard = result.leaderboard;
+
+            // Highlight the new score
+            if (result.rank !== null) {
+                newScoreRank = result.rank;
+                isNewHighScore = true;
+            }
+
+            // Update the UI
+            renderLeaderboard();
+
+            // Also update local storage as backup
+            saveLeaderboard();
+
+            return true;
+        } else {
+            console.error('Failed to submit score:', result.message);
+            return false;
+        }
+    } catch (e) {
+        console.error('Error submitting score to API:', e);
+
+        // Fall back to local storage if API is unavailable
+        // Insert the new score at the correct position
+        leaderboard.splice(newScoreRank, 0, {
+            initials: formattedInitials,
+            score: currentScore
+        });
+
+        // Keep only the top 10 scores
+        if (leaderboard.length > 10) {
+            leaderboard = leaderboard.slice(0, 10);
+        }
+
+        // Save to local storage as backup
+        saveLeaderboard();
+
+        // Update the UI
+        renderLeaderboard();
+
+        return true;
     }
-
-    // Save updated leaderboard
-    saveLeaderboard();
-
-    // Update the leaderboard display
-    renderLeaderboard();
 }
 
 // Render the leaderboard HTML
@@ -3516,21 +3582,42 @@ function hideLeaderboard() {
 }
 
 // Handle score submission
-function handleScoreSubmit() {
+async function handleScoreSubmit() {
     if (playerInitialsInput && isNewHighScore) {
         const initials = playerInitialsInput.value.trim();
         if (initials) {
-            // Add score to leaderboard
-            addScoreToLeaderboard(initials, score);
+            // Disable submit button during submission
+            if (submitScoreButton) {
+                submitScoreButton.disabled = true;
+                submitScoreButton.textContent = 'SENDING...';
+            }
 
-            // Hide form and reset
-            highScoreForm.style.display = 'none';
-            playerInitialsInput.value = '';
-            isNewHighScore = false;
+            try {
+                // Add score to leaderboard (async)
+                const success = await addScoreToLeaderboard(initials, score);
 
-            // Play a sound if available
-            if (sounds && sounds.playSound) {
-                sounds.playSound('powerUp');
+                if (success) {
+                    // Hide form and reset
+                    highScoreForm.style.display = 'none';
+                    playerInitialsInput.value = '';
+                    isNewHighScore = false;
+
+                    // Play a sound if available
+                    if (sounds && sounds.playSound) {
+                        sounds.playSound('powerUp');
+                    }
+                } else {
+                    alert('Failed to submit score. Please try again.');
+                }
+            } catch (error) {
+                console.error('Error in score submission:', error);
+                alert('An error occurred while submitting your score.');
+            } finally {
+                // Re-enable submit button
+                if (submitScoreButton) {
+                    submitScoreButton.disabled = false;
+                    submitScoreButton.textContent = 'SUBMIT';
+                }
             }
         } else {
             // Flash the input if empty
