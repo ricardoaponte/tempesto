@@ -34,6 +34,10 @@
             pointer-events: all;
         }
 
+        .hidden {
+            display: none;
+        }
+
         .control-row {
             display: flex;
             justify-content: start;
@@ -119,7 +123,7 @@
         /* Shared styles for UI and Menu */
         #ui, #game-over, #menu, #level-complete {
             position: absolute;
-            /*z-index: 100;*/
+            z-index: 1000;
             pointer-events: none;
             text-shadow: 0 0 5px;
             font-size: 1em;
@@ -177,6 +181,7 @@
         }
 
         #lives, #bombs {
+            font-size: .8em;
             color: #ff5555;
             text-shadow: 0 0 8px #ff0000;
             padding: 3px 6px;
@@ -199,6 +204,7 @@
         }
 
         #power-ups #active-power {
+            font-size: .8em;
             color: #ff00ff;
             text-shadow: 0 0 8px #ff00ff;
             padding: 3px 6px;
@@ -210,6 +216,7 @@
         }
 
         #level-indicator #current-level {
+            font-size: .8em;
             color: #00ffff;
             text-shadow: 0 0 8px #00ffff;
             padding: 3px 6px;
@@ -218,7 +225,6 @@
             border: 1px solid rgba(0, 255, 255, 0.3);
             box-shadow: inset 0 0 10px rgba(0, 255, 255, 0.2);
             letter-spacing: 0;
-            font-size: 1em;
             font-weight: bold;
             display: inline-block;
         }
@@ -434,7 +440,7 @@
 </head>
 <body>
 
-<div id="pause-screen">PAUSED</div>
+<div id="pause-screen"></div>
 
 <div id="instructions-modal">
     <h2>INSTRUCTIONS</h2>
@@ -547,20 +553,20 @@
         <div id="score">SCORE: 0</div>
         <div id="high-score">HIGH SCORE: 0</div>
     </div>
-    <div class="ui-row">
+    <div class="ui-row hidden">
         <div id="lives">LIVES: 3</div>
-        <div id="enemies-remaining">ENEMIES: 0/0</div>
+        <div id="bombs">💣: 3</div>
+<!--        <div id="enemies-remaining">ENEMIES: 0/0</div>-->
     </div>
     <div class="ui-row">
-        <div id="bombs">💣: 3</div>
         <div id="power-ups">
             <div id="active-power">POWER: NONE</div>
         </div>
-    </div>
-    <div class="ui-row" style="align-items: center;">
         <div id="level-indicator">
             <div id="current-level">LEVEL: 1</div>
         </div>
+    </div>
+    <div class="ui-row" style="align-items: center;">
     </div>
 </div>
 
@@ -931,13 +937,26 @@
                     touchStartTime = Date.now();
                     isSwiping = false; // Reset swipe state
 
-                    // Check for double tap (toggle rotation)
+                    // Check for double tap (toggle pause)
                     const currentTime = Date.now();
                     if (currentTime - lastTapTime < 300) { // 300ms between taps
-                        // Toggle rotation enabled flag
-                        isRotationEnabled = !isRotationEnabled;
-                        // Save rotation state to localStorage
-                        saveRotationState();
+                        // Only toggle pause if game is playing and instructions are not visible
+                        if (gameState === 'playing') {
+                            const instructionsModal = document.getElementById('instructions-modal');
+                            const isInstructionsVisible = instructionsModal && instructionsModal.style.display === 'block';
+
+                            if (!isInstructionsVisible) {
+                                isPaused = !isPaused;
+                                pauseScreen.style.display = isPaused ? 'block' : 'none';
+                                menuElement.style.display = isPaused ? 'block' : 'none';
+                                updateStartButtonText();
+
+                                if (!isPaused) {
+                                    // Apply settings when resuming
+                                    applyGameSettings();
+                                }
+                            }
+                        }
                         e.preventDefault(); // Prevent zoom
                     }
                     lastTapTime = currentTime;
@@ -2322,7 +2341,7 @@
         updateLivesUI();
         updateLevelUI();
         updatePowerUpUI();
-        updateEnemiesRemainingUI();
+        //updateEnemiesRemainingUI();
         updateBombsUI();
 
         uiElement.style.display = 'block';
