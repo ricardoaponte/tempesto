@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>TEMPESTO</title>
+    <title>Orbitron</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@500;700&display=swap');
         body {
@@ -438,7 +438,7 @@
 
 <div id="instructions-modal">
     <h2>INSTRUCTIONS</h2>
-    <p>ARROWS: MOVE | SPACE: FIRE | B: BOMB | P/ENTER: PAUSE</p>
+    <p>ARROWS: MOVE | SPACE: FIRE | B: 💣 | P/ENTER: PAUSE</p>
     <p>MOUSE: ROTATE TUNNEL | CLICK: TOGGLE ROTATION</p>
     <button id="close-instructions-button">CLOSE</button>
 </div>
@@ -453,7 +453,7 @@
         <div id="right-button" class="touch-button">→</div>
     </div>
     <div class="control-row">
-        <div id="bomb-button" class="touch-button">BOMB</div>
+        <div id="bomb-button" class="touch-button">💣</div>
         <div id="fire-button" class="touch-button">FIRE</div>
     </div>
     </div>
@@ -463,7 +463,8 @@
     <h1>GAME OVER</h1>
     <div id="final-score"></div>
     <div id="final-high-score"></div>
-    <button id="restart-button">RESTART</button>
+    <button id="replay-button">REPLAY</button>
+    <button id="restart-button">MENU</button>
 </div>
 
 <div id="level-complete">
@@ -474,7 +475,7 @@
 </div>
 
 <div id="menu">
-    <h1>TEMPESTO</h1>
+    <h1>Orbitron</h1>
     <div>
         <label for="speed-select">PLAYER SPEED:</label>
         <select id="speed-select">
@@ -551,7 +552,7 @@
         <div id="enemies-remaining">ENEMIES: 0/0</div>
     </div>
     <div class="ui-row">
-        <div id="bombs">BOMBS: 3</div>
+        <div id="bombs">💣: 3</div>
         <div id="power-ups">
             <div id="active-power">POWER: NONE</div>
         </div>
@@ -664,6 +665,7 @@
     const finalScoreUI = document.getElementById('final-score');
     const finalHighScoreUI = document.getElementById('final-high-score');
     const restartButton = document.getElementById('restart-button');
+    const replayButton = document.getElementById('replay-button');
     const menuElement = document.getElementById('menu');
     const speedSelect = document.getElementById('speed-select');
     const difficultySelect = document.getElementById('difficulty-select');
@@ -781,7 +783,7 @@
                     <h2>INSTRUCTIONS</h2>
                     <p>TOUCH: LEFT BUTTON MOVES RIGHT, RIGHT BUTTON MOVES LEFT</p>
                     <p>SWIPE: LEFT TO MOVE RIGHT, RIGHT TO MOVE LEFT</p>
-                    <p>FIRE BUTTON: SHOOT | BOMB BUTTON: BOMB</p>
+                    <p>FIRE BUTTON: SHOOT | BOMB BUTTON: 💣</p>
                     <p>PAUSE BUTTON: PAUSE | ROTATE BUTTON: TOGGLE ROTATION</p>
                     <p>DRAG: ROTATE TUNNEL</p>
                     <button id="close-instructions-button">CLOSE</button>
@@ -1190,6 +1192,7 @@
         // Button listeners
         if (startButton) startButton.addEventListener('click', startGame);
         if (restartButton) restartButton.addEventListener('click', restartGame);
+        if (replayButton) replayButton.addEventListener('click', replayGame);
         // We don't need the next level button anymore as levels continue automatically
         // if (nextLevelButton) nextLevelButton.addEventListener('click', nextLevel);
 
@@ -2475,6 +2478,18 @@
         clearGameObjects();
     }
 
+    // --- Replay Game Function ---
+    function replayGame() {
+        // Initialize audio after user interaction
+        sounds.initializeAudio();
+
+        // Hide game over screen
+        gameOverScreen.style.display = 'none';
+
+        // Start a new game directly
+        startGame();
+    }
+
     // --- Clear all game objects ---
     function clearGameObjects() {
         // Remove all enemies
@@ -3210,7 +3225,7 @@
                             updateBombsUI();
 
                             // Show message
-                            showMessage("BOMB ACQUIRED!", 0xff8800);
+                            showMessage("💣 ACQUIRED!", 0xff8800);
 
                             // Play power-up sound
                             sounds.play('powerUp');
@@ -3358,7 +3373,7 @@
             updateBombsUI();
 
             // Visual feedback for getting a new bomb
-            const message = newBombs === 1 ? "NEW BOMB ACQUIRED!" : newBombs + " NEW BOMBS ACQUIRED!";
+            const message = newBombs === 1 ? "NEW 💣 ACQUIRED!" : newBombs + " NEW 💣 ACQUIRED!";
             showMessage(message, 0xffff00);
         }
     }
@@ -3435,7 +3450,7 @@
     }
 
     function updateBombsUI() {
-        bombsUI.textContent = 'BOMBS: ' + bombs;
+        bombsUI.textContent = '💣: ' + bombs;
     }
 
 
