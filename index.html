@@ -2341,7 +2341,6 @@
         updateLivesUI();
         updateLevelUI();
         updatePowerUpUI();
-        //updateEnemiesRemainingUI();
         updateBombsUI();
 
         uiElement.style.display = 'block';
@@ -2496,7 +2495,6 @@
 
         // Update UI
         updateLevelUI();
-        updateEnemiesRemainingUI();
         updateBombsUI();
 
         // We don't need to hide the level complete screen anymore as it's not shown
@@ -3221,7 +3219,6 @@
                     const hitPoints = enemy.points;
                     addScore(hitPoints);
                     enemiesKilled++;
-                    updateEnemiesRemainingUI();
 
                     // Get enemy color for explosion effect
                     let explosionColor;
@@ -3275,7 +3272,6 @@
 
                         // Update enemiesRequired to account for the new enemies
                         enemiesRequired += newEnemiesCreated;
-                        updateEnemiesRemainingUI();
 
                         // Show message
                         //showMessage("ENEMY SPLIT!", 0x8800ff);
@@ -3512,11 +3508,6 @@
         powerUpUI.textContent = powerText;
     }
 
-    function updateEnemiesRemainingUI() {
-        const remaining = Math.max(0, enemiesRequired - enemiesKilled);
-        enemiesRemainingUI.textContent = 'ENEMIES: ' + remaining + '/' + enemiesRequired;
-    }
-
     function updateBombsUI() {
         bombsUI.textContent = '💣: ' + bombs;
     }
@@ -3677,7 +3668,6 @@
         // Add score for destroyed enemies
         if (totalPoints > 0) {
             addScore(totalPoints);
-            updateEnemiesRemainingUI();
         }
 
         // Check if level is complete
