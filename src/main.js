@@ -106,6 +106,7 @@ const webTypeSelect = document.getElementById('web-type-select');
 const tubeWidthSelect = document.getElementById('tube-width-select');
 const livesSelect = document.getElementById('lives-select');
 const shipSelect = document.getElementById('ship-select');
+const gameShipSelect = document.getElementById('game-ship-select');
 const startButton = document.getElementById('start-button');
 
 
@@ -702,6 +703,20 @@ function init() {
     if (replayButton) replayButton.addEventListener('click', replayGame);
     // We don't need the next level button anymore as levels continue automatically
     // if (nextLevelButton) nextLevelButton.addEventListener('click', nextLevel);
+
+    // Ship selection listeners - works during gameplay to change ship on the fly
+    if (shipSelect) shipSelect.addEventListener('change', function() {
+        // Update the in-game selector to match
+        if (gameShipSelect) gameShipSelect.value = shipSelect.value;
+        changeShipType(shipSelect.value);
+    });
+
+    // In-game ship selector
+    if (gameShipSelect) gameShipSelect.addEventListener('change', function() {
+        // Update the menu selector to match
+        if (shipSelect) shipSelect.value = gameShipSelect.value;
+        changeShipType(gameShipSelect.value);
+    });
 
     // Sound toggle buttons listeners
     const soundToggleButton = document.getElementById('sound-toggle');
@@ -1831,6 +1846,11 @@ function startGame() {
     const selectedLives = livesSelect.value;
     // Update global ship type
     shipType = shipSelect.value;
+
+    // Sync the in-game ship selector with the menu selection
+    if (gameShipSelect) {
+        gameShipSelect.value = shipType;
+    }
 
     setGameSettings(selectedSpeed, selectedDifficulty, selectedWebType, selectedTubeWidth, selectedLives);
 
@@ -3283,6 +3303,27 @@ const initAudioOnInteraction = async (event) => {
 document.addEventListener('click', initAudioOnInteraction);
 document.addEventListener('keydown', initAudioOnInteraction);
 document.addEventListener('touchstart', initAudioOnInteraction);
+
+// Function to change ship type during gameplay
+function changeShipType(newShipType) {
+    if (newShipType && newShipType !== shipType) {
+        console.log(`Changing ship from ${shipType} to ${newShipType}`);
+        shipType = newShipType;
+
+        // Update dropdown in case this was called programmatically
+        if (shipSelect.value !== newShipType) {
+            shipSelect.value = newShipType;
+        }
+
+        // Recreate the player with the new ship type
+        createPlayer();
+
+        // Play a sound effect for ship change if game is running
+        if (isGameRunning && !isPaused) {
+            sounds.playSound('powerUp');
+        }
+    }
+}
 
 // --- Start the Game ---
 init();
