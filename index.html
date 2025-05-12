@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Orbitron</title>
+    <script src="audio-worklet-manager.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@500;700&display=swap');
         body {
@@ -733,6 +734,12 @@
             const savedSoundState = localStorage.getItem(STORAGE_KEY_SOUND_ENABLED);
             if (savedSoundState !== null) {
                 isSoundEnabled = savedSoundState === 'true';
+
+                // Initialize AudioWorklet manager's sound enabled state
+                if (window.audioWorkletManager) {
+                    window.audioWorkletManager.setSoundEnabled(isSoundEnabled);
+                }
+
                 updateSoundToggleButton();
             }
         } catch (e) {
@@ -743,6 +750,12 @@
     // --- Toggle Sound ---
     function toggleSound() {
         isSoundEnabled = !isSoundEnabled;
+
+        // Update AudioWorklet manager's sound enabled state
+        if (window.audioWorkletManager) {
+            window.audioWorkletManager.setSoundEnabled(isSoundEnabled);
+        }
+
         updateSoundToggleButton();
         saveSoundState();
     }
@@ -1020,73 +1033,111 @@
         }
     }
 
-    // Sound effects object
+    // Sound effects object using AudioWorklet
     const sounds = {
         fire: null,
         explode: null,
         powerUp: null,
         bomb: null,
         initialized: false,
+        soundPaths: {
+            fire: 'assets/sounds/blast-37988.mp3',
+            explode: 'assets/sounds/explosion-8-bit-14-314686.wav',
+            powerUp: 'assets/sounds/collect-points-190037.mp3',
+            bomb: 'assets/sounds/blast-37988.mp3'
+        },
 
         // Initialize all sounds
-        init: function() {
-            // Laser sound (short beep) - using WAV format
-            this.fire = fireSound;
+        init: async function() {
+            // Check if AudioWorkletManager is available, with retry
+            if (!window.audioWorkletManager) {
+                console.log('AudioWorkletManager not available yet, waiting...');
+                // Wait for AudioWorkletManager to be available (up to 5 seconds)
+                await this.waitForAudioWorkletManager(5000);
+            }
 
-            // Explosion sound (boom) - using WAV format
-            this.explode = explosionSound;
+            // Try to initialize with AudioWorkletManager
+            if (window.audioWorkletManager) {
+                try {
+                    // Load all sounds
+                    const loadPromises = [];
 
-            // Power-up sound (chime) - using WAV format
-            this.powerUp = powerUpSound;
+                    for (const [name, path] of Object.entries(this.soundPaths)) {
+                        loadPromises.push(
+                            window.audioWorkletManager.loadSound(name, path)
+                                .catch(err => console.error(`Failed to load sound ${name}:`, err))
+                        );
+                    }
 
-            this.bomb = bombSound;
+                    // Wait for all sounds to load
+                    await Promise.all(loadPromises);
+                    console.log('All sounds loaded successfully');
+                    this.initialized = true;
+                } catch (error) {
+                    console.error('Failed to initialize sounds:', error);
+                }
+            } else {
+                console.error('AudioWorkletManager not available after waiting');
+            }
+        },
 
-            // Preload sounds
-            this.fire.load();
-            this.explode.load();
-            this.powerUp.load();
-            this.bomb.load();
+        // Helper function to wait for AudioWorkletManager to be available
+        waitForAudioWorkletManager: function(timeout) {
+            return new Promise(resolve => {
+                const startTime = Date.now();
+                const checkInterval = 100; // Check every 100ms
+
+                const checkForManager = () => {
+                    if (window.audioWorkletManager) {
+                        console.log('AudioWorkletManager is now available');
+                        resolve(true);
+                        return;
+                    }
+
+                    const elapsedTime = Date.now() - startTime;
+                    if (elapsedTime >= timeout) {
+                        console.error(`Timeout waiting for AudioWorkletManager after ${timeout}ms`);
+                        resolve(false);
+                        return;
+                    }
+
+                    setTimeout(checkForManager, checkInterval);
+                };
+
+                checkForManager();
+            });
         },
 
         // Initialize audio context after user interaction
-        initializeAudio: function() {
+        initializeAudio: async function() {
             if (!this.initialized) {
-                // Create an AudioContext to ensure proper initialization
-                if (!window.audioContext) {
+                // Check if AudioWorkletManager is available, with retry
+                if (!window.audioWorkletManager) {
+                    console.log('AudioWorkletManager not available yet for initialization, waiting...');
+                    // Wait for AudioWorkletManager to be available (up to 5 seconds)
+                    await this.waitForAudioWorkletManager(5000);
+                }
+
+                if (window.audioWorkletManager) {
                     try {
-                        window.AudioContext = window.AudioContext || window.webkitAudioContext;
-                        window.audioContext = new AudioContext();
-                    } catch (e) {
-                        console.log("Failed to create AudioContext:", e);
+                        // Initialize the AudioWorklet manager
+                        await window.audioWorkletManager.initialize();
+
+                        // Load all sounds
+                        await this.init();
+
+                        console.log('Audio system initialized');
+                    } catch (error) {
+                        console.error('Failed to initialize audio system:', error);
                     }
+                } else {
+                    console.error('AudioWorkletManager not available after waiting');
                 }
-
-                // Resume the AudioContext if it's suspended
-                if (window.audioContext && window.audioContext.state === 'suspended') {
-                    window.audioContext.resume().catch(e => {
-                        console.log("Failed to resume AudioContext:", e);
-                    });
-                }
-
-                // Play a silent sound to unlock audio on mobile devices
-                const silentSound = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQQAAAAAAA==');
-                silentSound.play().then(() => {
-                    console.log("Audio context initialized");
-                    this.initialized = true;
-                }).catch(e => {
-                    console.log("Failed to initialize audio context:", e);
-                });
-
-                // Also try to initialize all sound elements
-                if (this.fire) this.fire.load();
-                if (this.explode) this.explode.load();
-                if (this.powerUp) this.powerUp.load();
-                if (this.bomb) this.bomb.load();
             }
         },
 
         // Play a sound with error handling
-        play: function(sound) {
+        play: async function(sound) {
             // If sounds are disabled, don't play anything
             if (!isSoundEnabled) {
                 return;
@@ -1094,48 +1145,47 @@
 
             // If not initialized, try to initialize first
             if (!this.initialized) {
-                this.initializeAudio();
+                await this.initializeAudio();
+                return; // Don't try to play until initialized
             }
 
-            if (this[sound]) {
+            // Check if AudioWorkletManager is available
+            if (!window.audioWorkletManager) {
+                console.log('AudioWorkletManager not available for playing sound, waiting...');
+                const available = await this.waitForAudioWorkletManager(2000);
+                if (!available) {
+                    console.error('Could not play sound - AudioWorkletManager not available');
+                    return;
+                }
+            }
+
+            if (window.audioWorkletManager && this.soundPaths[sound]) {
                 try {
-                    // Try to resume AudioContext if it exists and is suspended
-                    if (window.audioContext && window.audioContext.state === 'suspended') {
-                        window.audioContext.resume().catch(e => {
-                            console.log("Failed to resume AudioContext:", e);
-                        });
+                    // Resume audio context if needed
+                    const resumed = await window.audioWorkletManager.resumeAudioContext();
+
+                    if (!resumed) {
+                        console.log('Audio context could not be resumed, not playing sound');
+                        return;
                     }
 
-                    // Clone the audio to allow overlapping sounds
-                    const soundClone = this[sound].cloneNode();
-                    soundClone.volume = 0.5; // Set volume to 50%
-
-                    // Play the sound with error handling
-                    const playPromise = soundClone.play();
-
-                    // Handle browsers where play() doesn't return a promise
-                    if (playPromise !== undefined) {
-                        playPromise.catch(e => {
-                            console.log("Error playing sound:", e);
-                            // If failed due to no user interaction, we'll try again after interaction
-                            if (e.name === "NotAllowedError") {
-                                this.initialized = false;
-
-                                // Add a one-time click event listener to the document to initialize audio on next interaction
-                                if (!window.audioInitializationClickHandler) {
-                                    window.audioInitializationClickHandler = true;
-                                    document.addEventListener('click', () => {
-                                        this.initializeAudio();
-                                        window.audioInitializationClickHandler = false;
-                                    }, { once: true });
-                                }
-                            }
-                        });
+                    // Verify the context is running
+                    if (window.audioWorkletManager.audioContext.state !== 'running') {
+                        console.warn('Audio context is not running after resume, state:',
+                                    window.audioWorkletManager.audioContext.state);
                     }
+
+                    // Play the sound
+                    const result = window.audioWorkletManager.playSound(sound, { volume: 0.5 });
+                    console.log('Sound play result:', result);
                 } catch (e) {
-                    console.log("Exception when trying to play sound:", e);
+                    console.error("Exception when trying to play sound:", e);
                     this.initialized = false;
                 }
+            } else {
+                console.warn('Cannot play sound, either AudioWorkletManager is not available or sound path is not defined');
+                console.log('AudioWorkletManager available:', !!window.audioWorkletManager);
+                console.log('Sound path available:', !!this.soundPaths[sound]);
             }
         }
     };
@@ -3707,12 +3757,56 @@
 
     // --- Setup Audio Initialization on User Interaction ---
     // Add event listeners to initialize audio on first user interaction
-    const initAudioOnInteraction = () => {
-        sounds.initializeAudio();
+    const initAudioOnInteraction = async (event) => {
+        console.log('User interaction detected, initializing audio...');
+
+        // First, directly try to resume the audio context if it exists
+        if (window.audioWorkletManager && window.audioWorkletManager.audioContext) {
+            try {
+                console.log('AudioContext exists, attempting to resume directly after user interaction');
+                const state = window.audioWorkletManager.audioContext.state;
+                console.log('Current AudioContext state:', state);
+
+                if (state === 'suspended') {
+                    await window.audioWorkletManager.audioContext.resume();
+                    console.log('AudioContext resumed directly, new state:', window.audioWorkletManager.audioContext.state);
+                }
+            } catch (error) {
+                console.error('Failed to resume AudioContext directly:', error);
+            }
+        } else {
+            console.log('AudioWorkletManager or AudioContext not available yet');
+        }
+
+        // Then continue with normal sound initialization
+        await sounds.initializeAudio();
+
+        // Play a silent sound to unblock audio
+        try {
+            if (window.audioWorkletManager) {
+                // Create a silent oscillator to unblock audio
+                const context = window.audioWorkletManager.audioContext;
+                if (context) {
+                    const oscillator = context.createOscillator();
+                    const gain = context.createGain();
+                    gain.gain.value = 0.001; // Nearly silent
+                    oscillator.connect(gain);
+                    gain.connect(context.destination);
+                    oscillator.start(0);
+                    oscillator.stop(0.1); // Very short duration
+                    console.log('Played silent sound to unblock audio');
+                }
+            }
+        } catch (error) {
+            console.error('Failed to play silent sound:', error);
+        }
+
         // Remove the event listeners once audio is initialized
         document.removeEventListener('click', initAudioOnInteraction);
         document.removeEventListener('keydown', initAudioOnInteraction);
         document.removeEventListener('touchstart', initAudioOnInteraction);
+
+        console.log('Audio initialization complete, removed event listeners');
     };
 
     // Add event listeners for common user interactions
