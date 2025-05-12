@@ -18,6 +18,12 @@
     <button id="close-instructions-button">CLOSE</button>
 </div>
 
+<div id="leaderboard-modal" style="display: none;">
+    <h2>TOP SCORES</h2>
+    <div id="modal-leaderboard-table"></div>
+    <button id="close-leaderboard-button">CLOSE</button>
+</div>
+
 <!--<div id="instructions-button" class="game-button">I</div>-->
 <div style="margin-left: -55px;" id="game-sound-toggle">S</div>
 <!-- Mobile touch controls -->
@@ -38,6 +44,18 @@
     <h1>GAME OVER</h1>
     <div id="final-score"></div>
     <div id="final-high-score"></div>
+    <div id="leaderboard-container">
+        <h2>LEADERBOARD</h2>
+        <div id="leaderboard-table"></div>
+    </div>
+    <div id="high-score-form" style="display: none;">
+        <h3>NEW HIGH SCORE!</h3>
+        <div class="form-row">
+            <label for="player-initials">ENTER YOUR INITIALS:</label>
+            <input type="text" id="player-initials" maxlength="3" placeholder="AAA" autocomplete="off">
+            <button id="submit-score">SUBMIT</button>
+        </div>
+    </div>
     <button id="replay-button">REPLAY</button>
     <button id="restart-button">MENU</button>
 </div>
@@ -113,6 +131,9 @@
     <div>
         <label for="sound-toggle">SOUND:</label>
         <button id="sound-toggle" class="toggle-button">ON</button>
+    </div>
+    <div>
+        <button id="show-leaderboard-button" class="menu-button">LEADERBOARD</button>
     </div>
     <button id="start-button">START GAME</button>
 </div>

@@ -1,4 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@500;700&display=swap');
+
 body {
     margin: 0;
     overflow: hidden;
@@ -384,6 +385,115 @@ canvas {
 #instructions-modal button:hover {
     text-shadow: 0 0 15px #00ffff;
     box-shadow: 0 0 10px #00ffff;
+}
+
+/* Leaderboard styles */
+#leaderboard-modal {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: rgba(0, 0, 0, 0.9);
+    border: 2px solid #ffcc00;
+    padding: 20px;
+    text-align: center;
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 0.8em;
+    z-index: 2000;
+    max-width: 90%;
+    width: 500px;
+    box-sizing: border-box;
+    box-shadow: 0 0 20px rgba(255, 204, 0, 0.5);
+}
+
+#leaderboard-modal h2 {
+    margin-top: 0;
+    color: #ffcc00;
+    text-shadow: 0 0 10px #ffcc00;
+}
+
+#leaderboard-modal button, #high-score-form button {
+    padding: 8px 15px;
+    cursor: pointer;
+    background-color: #000;
+    color: #ffcc00;
+    border: 2px solid #ffcc00;
+    text-shadow: 0 0 5px #ffcc00;
+    font-family: 'Orbitron', 'Rajdhani', sans-serif;
+    font-size: 0.8em;
+    margin-top: 15px;
+    width: 100%;
+}
+
+#leaderboard-modal button:hover, #high-score-form button:hover {
+    text-shadow: 0 0 15px #ffcc00;
+    box-shadow: 0 0 10px #ffcc00;
+}
+
+#leaderboard-container {
+    margin: 20px 0;
+    color: #ffcc00;
+}
+
+#leaderboard-container h2, #high-score-form h3 {
+    margin-top: 0;
+    color: #ffcc00;
+    text-shadow: 0 0 10px #ffcc00;
+}
+
+.leaderboard-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+}
+
+.leaderboard-table th, .leaderboard-table td {
+    padding: 8px;
+    text-align: center;
+    border-bottom: 1px solid rgba(255, 204, 0, 0.3);
+}
+
+.leaderboard-table th {
+    background-color: rgba(255, 204, 0, 0.2);
+    color: #ffcc00;
+    text-shadow: 0 0 5px #ffcc00;
+}
+
+.leaderboard-table .highlight {
+    background-color: rgba(255, 204, 0, 0.3);
+    font-weight: bold;
+}
+
+#high-score-form {
+    margin: 20px 0;
+}
+
+#high-score-form .form-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 10px;
+}
+
+#high-score-form label {
+    margin-right: 10px;
+}
+
+#high-score-form input {
+    background-color: rgba(0, 0, 0, 0.7);
+    border: 2px solid #ffcc00;
+    padding: 8px;
+    color: #ffcc00;
+    font-family: 'Orbitron', 'Rajdhani', sans-serif;
+    font-size: 1em;
+    text-align: center;
+    width: 60px;
+    text-transform: uppercase;
+    outline: none;
+}
+
+#high-score-form input:focus {
+    box-shadow: 0 0 10px #ffcc00;
 }
 
 #instructions-button {

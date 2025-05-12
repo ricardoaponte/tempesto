@@ -28,6 +28,7 @@ const STORAGE_KEY_ROTATION_Y = 'tempest3d_rotationY';
 const STORAGE_KEY_ROTATION_ENABLED = 'tempest3d_rotationEnabled';
 const STORAGE_KEY_HIGH_SCORE = 'tempest3d_highScore';
 const STORAGE_KEY_SOUND_ENABLED = 'tempest3d_soundEnabled';
+const STORAGE_KEY_LEADERBOARD = 'tempest3d_leaderboard';
 
 // Debounce timer for saving rotation state
 let saveRotationTimer = null;
@@ -74,6 +75,11 @@ let lives = 3;
 let level = 1;
 let enemiesKilled = 0;
 let enemiesRequired = enemiesPerLevel;
+
+// Leaderboard
+let leaderboard = [];
+let isNewHighScore = false;
+let newScoreRank = -1;
 let enemySpawnTimer = 0;
 let playerCurrentLaneIndex = Math.floor(NUM_LANES / 2);
 let lastLaneChangeFrame = 0;
@@ -108,6 +114,17 @@ const livesSelect = document.getElementById('lives-select');
 const shipSelect = document.getElementById('ship-select');
 const gameShipSelect = document.getElementById('game-ship-select');
 const startButton = document.getElementById('start-button');
+
+// Leaderboard elements
+const leaderboardContainer = document.getElementById('leaderboard-container');
+const leaderboardTable = document.getElementById('leaderboard-table');
+const modalLeaderboardTable = document.getElementById('modal-leaderboard-table');
+const leaderboardModal = document.getElementById('leaderboard-modal');
+const showLeaderboardButton = document.getElementById('show-leaderboard-button');
+const closeLeaderboardButton = document.getElementById('close-leaderboard-button');
+const highScoreForm = document.getElementById('high-score-form');
+const playerInitialsInput = document.getElementById('player-initials');
+const submitScoreButton = document.getElementById('submit-score');
 
 
 // --- Save and Load Rotation State ---
@@ -622,6 +639,9 @@ function init() {
     // Load high score
     loadHighScore();
 
+    // Load leaderboard
+    loadLeaderboard();
+
     // Load sound state
     loadSoundState();
 
@@ -724,6 +744,11 @@ function init() {
 
     if (soundToggleButton) soundToggleButton.addEventListener('click', toggleSound);
     if (gameSoundToggleButton) gameSoundToggleButton.addEventListener('click', toggleSound);
+
+    // Leaderboard button listeners
+    if (showLeaderboardButton) showLeaderboardButton.addEventListener('click', showLeaderboard);
+    if (closeLeaderboardButton) closeLeaderboardButton.addEventListener('click', hideLeaderboard);
+    if (submitScoreButton) submitScoreButton.addEventListener('click', handleScoreSubmit);
 
 
     // Start the animation loop
@@ -1871,6 +1896,18 @@ function startGame() {
     lastLaneChangeFrame = 0;
     activePowerUp = null;
     powerUpTimer = 0;
+
+    // Reset leaderboard state
+    isNewHighScore = false;
+    newScoreRank = -1;
+
+    // Hide leaderboard elements
+    if (leaderboardContainer) {
+        leaderboardContainer.style.display = 'none';
+    }
+    if (highScoreForm) {
+        highScoreForm.style.display = 'none';
+    }
     bombs = 0; // Reset bombs to 0
     lastBombMilestone = 0; // Reset last bomb milestone
 
@@ -2908,6 +2945,30 @@ function endGame() {
     gameState = 'gameover';
     finalScoreUI.textContent = 'FINAL SCORE: ' + score;
     finalHighScoreUI.textContent = 'HIGH SCORE: ' + highScore;
+
+    // Check if player's score qualifies for the leaderboard
+    const isLeaderboardScore = checkHighScore(score);
+
+    // Show high score form if it's a new high score
+    if (highScoreForm) {
+        highScoreForm.style.display = isLeaderboardScore ? 'block' : 'none';
+
+        if (isLeaderboardScore && playerInitialsInput) {
+            // Focus on the input field and select any existing text
+            setTimeout(() => {
+                playerInitialsInput.focus();
+                playerInitialsInput.select();
+            }, 300);
+        }
+    }
+
+    // Update and display the leaderboard
+    renderLeaderboard();
+    if (leaderboardContainer) {
+        leaderboardContainer.style.display = 'block';
+    }
+
+    // Show game over screen
     gameOverScreen.style.display = 'block';
     uiElement.style.display = 'none';
     document.getElementById('power-ups').style.display = 'none';
@@ -2918,6 +2979,9 @@ function endGame() {
 
     // Hide player
     player.visible = false;
+
+    // Play game over sound
+    sounds.playSound('explode');
 
     // Clear power-up timer
     if (activePowerUp) {
@@ -3321,6 +3385,159 @@ function changeShipType(newShipType) {
         // Play a sound effect for ship change if game is running
         if (isGameRunning && !isPaused) {
             sounds.playSound('powerUp');
+        }
+    }
+}
+
+// --- Leaderboard Functions ---
+
+// Load leaderboard from localStorage
+function loadLeaderboard() {
+    try {
+        const savedLeaderboard = localStorage.getItem(STORAGE_KEY_LEADERBOARD);
+        if (savedLeaderboard) {
+            leaderboard = JSON.parse(savedLeaderboard);
+        } else {
+            // Initialize with default values if no leaderboard exists
+            leaderboard = [
+                { initials: 'CPU', score: 5000 },
+                { initials: 'BOT', score: 4000 },
+                { initials: 'AI', score: 3000 },
+                { initials: 'PRO', score: 2000 },
+                { initials: 'MAX', score: 1000 }
+            ];
+            saveLeaderboard();
+        }
+    } catch (e) {
+        console.error('Failed to load leaderboard:', e);
+        leaderboard = [];
+    }
+}
+
+// Save leaderboard to localStorage
+function saveLeaderboard() {
+    try {
+        localStorage.setItem(STORAGE_KEY_LEADERBOARD, JSON.stringify(leaderboard));
+    } catch (e) {
+        console.error('Failed to save leaderboard:', e);
+    }
+}
+
+// Check if the current score qualifies for the leaderboard
+function checkHighScore(currentScore) {
+    // No entries yet or score is higher than the lowest score
+    if (leaderboard.length < 10 || currentScore > leaderboard[leaderboard.length - 1].score) {
+        // Find where to insert the new score
+        newScoreRank = 0;
+        while (newScoreRank < leaderboard.length && leaderboard[newScoreRank].score >= currentScore) {
+            newScoreRank++;
+        }
+
+        isNewHighScore = true;
+        return true;
+    }
+
+    isNewHighScore = false;
+    return false;
+}
+
+// Add a new score to the leaderboard
+function addScoreToLeaderboard(initials, currentScore) {
+    // Insert the new score at the correct position
+    leaderboard.splice(newScoreRank, 0, {
+        initials: initials.toUpperCase().substring(0, 3),
+        score: currentScore
+    });
+
+    // Keep only the top 10 scores
+    if (leaderboard.length > 10) {
+        leaderboard = leaderboard.slice(0, 10);
+    }
+
+    // Save updated leaderboard
+    saveLeaderboard();
+
+    // Update the leaderboard display
+    renderLeaderboard();
+}
+
+// Render the leaderboard HTML
+function renderLeaderboard(targetElement = leaderboardTable) {
+    if (!targetElement) return;
+
+    // Create the table
+    let html = `
+    <table class="leaderboard-table">
+        <thead>
+            <tr>
+                <th>RANK</th>
+                <th>PLAYER</th>
+                <th>SCORE</th>
+            </tr>
+        </thead>
+        <tbody>
+    `;
+
+    // Add table rows
+    leaderboard.forEach((entry, index) => {
+        const isHighlighted = (isNewHighScore && index === newScoreRank) ? 'highlight' : '';
+        html += `
+        <tr class="${isHighlighted}">
+            <td>${index + 1}</td>
+            <td>${entry.initials}</td>
+            <td>${entry.score}</td>
+        </tr>
+        `;
+    });
+
+    // Close the table
+    html += `
+        </tbody>
+    </table>
+    `;
+
+    // Set the HTML
+    targetElement.innerHTML = html;
+}
+
+// Show the leaderboard modal
+function showLeaderboard() {
+    if (leaderboardModal) {
+        renderLeaderboard(modalLeaderboardTable);
+        leaderboardModal.style.display = 'block';
+    }
+}
+
+// Hide the leaderboard modal
+function hideLeaderboard() {
+    if (leaderboardModal) {
+        leaderboardModal.style.display = 'none';
+    }
+}
+
+// Handle score submission
+function handleScoreSubmit() {
+    if (playerInitialsInput && isNewHighScore) {
+        const initials = playerInitialsInput.value.trim();
+        if (initials) {
+            // Add score to leaderboard
+            addScoreToLeaderboard(initials, score);
+
+            // Hide form and reset
+            highScoreForm.style.display = 'none';
+            playerInitialsInput.value = '';
+            isNewHighScore = false;
+
+            // Play a sound if available
+            if (sounds && sounds.playSound) {
+                sounds.playSound('powerUp');
+            }
+        } else {
+            // Flash the input if empty
+            playerInitialsInput.style.backgroundColor = 'rgba(255, 0, 0, 0.5)';
+            setTimeout(() => {
+                playerInitialsInput.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+            }, 300);
         }
     }
 }
