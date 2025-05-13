@@ -3140,6 +3140,49 @@ function updateBombsUI() {
     bombsUI.textContent = '💣: ' + bombs;
 }
 
+let fpsValues = [];
+let lastFpsUpdateTime = 0;
+let currentFps = 0;
+const FPS_UPDATE_INTERVAL = 500; // Update FPS display every 500ms
+const FPS_SAMPLE_SIZE = 20; // Number of frames to average
+
+// Add this function to calculate and update FPS
+function updateFPS(currentTime) {
+    if (!lastFrameTime) {
+        lastFrameTime = currentTime;
+        return;
+    }
+
+    // Calculate time difference since last frame
+    const deltaTime = currentTime - lastFrameTime;
+
+    // Calculate instantaneous FPS
+    const instantFps = 1000 / deltaTime;
+
+    // Add to rolling average
+    fpsValues.push(instantFps);
+
+    // Keep only the last N values
+    if (fpsValues.length > FPS_SAMPLE_SIZE) {
+        fpsValues.shift();
+    }
+
+    // Update the displayed FPS value every X milliseconds
+    if (currentTime - lastFpsUpdateTime > FPS_UPDATE_INTERVAL) {
+        // Calculate average FPS
+        currentFps = Math.round(
+          fpsValues.reduce((sum, value) => sum + value, 0) / fpsValues.length
+        );
+
+        // Update UI if you have an FPS display element
+        const fpsDisplay = document.getElementById('fps-display');
+        if (fpsDisplay) {
+            fpsDisplay.textContent = `FPS: ${currentFps}`;
+        }
+
+        lastFpsUpdateTime = currentTime;
+    }
+}
 
 // --- Animation Loop ---
 function animate() {
@@ -3147,6 +3190,8 @@ function animate() {
 
     // Calculate delta time
     const currentTime = performance.now();
+    // Calculate and update FPS
+    updateFPS(currentTime);
     const deltaTime = currentTime - lastFrameTime;
     lastFrameTime = currentTime;
 
