@@ -65,6 +65,7 @@ const BOMB_POINTS = 3000;
 // Configurable Settings
 let playerLaneChangeRate = 6;
 let currentEnemySpeed = 0.08;
+let originalEnemySpeed = 0.08; // Store original speed for returning after acceleration
 let currentEnemySpawnInterval = 50;
 let enemiesPerLevel = 20;
 
@@ -1811,21 +1812,25 @@ function setGameSettings(speed, difficultyParam, web, width, lives) {
     switch (difficultyParam) {
         case 'easy':
             currentEnemySpeed = 0.1;
+            originalEnemySpeed = 0.1;
             currentEnemySpawnInterval = 80;
             enemiesPerLevel = 15;
             break;
         case 'medium':
             currentEnemySpeed = 0.2;
+            originalEnemySpeed = 0.2;
             currentEnemySpawnInterval = 50;
             enemiesPerLevel = 20;
             break;
         case 'hard':
             currentEnemySpeed = 0.3;
+            originalEnemySpeed = 0.3;
             currentEnemySpawnInterval = 30;
             enemiesPerLevel = 25;
             break;
         default:
             currentEnemySpeed = 0.08;
+            originalEnemySpeed = 0.08;
             currentEnemySpawnInterval = 50;
             enemiesPerLevel = 20;
     }
@@ -2039,6 +2044,7 @@ function nextLevel() {
 
     // Increase difficulty
     currentEnemySpeed += 0.001;
+    originalEnemySpeed += 0.001; // Also update original speed for acceleration feature
     currentEnemySpawnInterval = Math.max(currentEnemySpawnInterval - 5, 20);
 
     // Scale number of enemies based on difficulty level and current level
@@ -2531,6 +2537,15 @@ function update(deltaTime) {
         return;
     }
 
+    // Handle acceleration with up arrow key
+    if (keyState['ArrowUp']) {
+        // Accelerate enemies and powerups
+        currentEnemySpeed = originalEnemySpeed * 10; // Double the speed when up arrow is pressed
+    } else {
+        // Return to original speed when up arrow is released
+        currentEnemySpeed = originalEnemySpeed;
+    }
+
     // Update web color
     updateWebColor(deltaTime);
 
@@ -2561,7 +2576,7 @@ function update(deltaTime) {
     }
 
     // Handle automatic firing for rapid fire power-up
-    if (activePowerUp === 'rapidFire' && currentFrame % 5 === 0) {
+    if (activePowerUp === 'rapidFire' && currentFrame % 12 === 0) {
         createProjectile();
     }
 
@@ -2981,7 +2996,7 @@ function endGame() {
     player.visible = false;
 
     // Play game over sound
-    sounds.playSound('explode');
+    sounds.play('explode');
 
     // Clear power-up timer
     if (activePowerUp) {
@@ -3134,9 +3149,6 @@ function animate() {
     const currentTime = performance.now();
     const deltaTime = currentTime - lastFrameTime;
     lastFrameTime = currentTime;
-
-    // Always update web rotation, even when paused
-    //updateWebRotation();
 
     // Always update stars animation, even when paused or in menu
     updateStars(deltaTime);
@@ -3631,4 +3643,3 @@ async function handleScoreSubmit() {
 
 // --- Start the Game ---
 init();
-
