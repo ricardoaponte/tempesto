@@ -114,7 +114,7 @@ async function addScore(env, request, initials, score) {
     }
 
     // Anti-cheat: Set reasonable maximum score limit (adjust based on your game)
-    const MAX_REASONABLE_SCORE = 100000;
+    const MAX_REASONABLE_SCORE = 100000000;
     if (score > MAX_REASONABLE_SCORE) {
         console.warn(`Suspicious score submission: ${initials} submitted ${score} points`);
         return new Response(JSON.stringify({
