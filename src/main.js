@@ -839,7 +839,7 @@ function createStars() {
 }
 
 // --- Create Web Geometry based on selected type ---
-function createWeb(type) {
+function createWeb(type, customSides) {
     // Remove existing web if any
     if (webMesh) {
         scene.remove(webMesh);
@@ -864,6 +864,11 @@ function createWeb(type) {
         case 'random':
             // Create a random polygon between 5 and 8 sides
             NUM_LANES = Math.floor(Math.random() * 4) + 5; // 5 to 8 sides
+            shape = createPolygonWeb(NUM_LANES);
+            break;
+        case 'custom':
+            // Create a custom polygon with the specified number of sides
+            NUM_LANES = customSides;
             shape = createPolygonWeb(NUM_LANES);
             break;
         case 'circle':
@@ -2031,8 +2036,8 @@ function startGame() {
 
     setGameSettings(selectedSpeed, selectedDifficulty, selectedWebType, selectedTubeWidth, selectedLives);
 
-    // Create the web based on selected type
-    createWeb(selectedWebType);
+    // Always start with a pentagon (5 sides) at level 1, regardless of user selection
+    createWeb('pentagon');
 
     // Create player with selected ship type
     createPlayer();
@@ -2220,10 +2225,11 @@ function nextLevel() {
     // Save current rotation state before transitioning to next level
     saveRotationState();
 
-    // Choose a new random web shape for variety
-    const webTypes = ['circle', 'pentagon', 'hexagon', 'octagon', 'random'];
-    const newWebType = webTypes[Math.floor(Math.random() * webTypes.length)];
-    createWeb(newWebType);
+    // Add a new side on each new level
+    const sides = level + 4; // level 1: 5 sides, level 2: 6 sides, etc.
+
+    // Create a custom web with the calculated number of sides
+    createWeb('custom', sides);
 
     // Reset player position after new web creation
     playerCurrentLaneIndex = Math.floor(NUM_LANES / 2);
