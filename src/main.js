@@ -2482,11 +2482,8 @@ function createEnemy(enemyType = 'regular') {
 
 // --- Create Power-Up ---
 function createPowerUp(position) {
-    const powerTypes = ['rapidFire', 'extraLife', 'superProjectile'];
+    const powerTypes = ['rapidFire', 'extraLife', 'superProjectile', 'shield'];
     const powerType = powerTypes[Math.floor(Math.random() * powerTypes.length)];
-
-    // Create power-up object
-    const powerGeometry = new THREE.SphereGeometry(0.8, 8, 8);
 
     // Color based on power-up type - using bright, distinct colors
     let powerColor;
@@ -2500,6 +2497,9 @@ function createPowerUp(position) {
         case 'superProjectile':
             powerColor = 0xFF00CC;
             break; // Hot Pink
+        case 'shield':
+            powerColor = 0x00DDFF;
+            break; // Bright Cyan
         default:
             powerColor = 0xFFFFFF; // White
     }
@@ -2513,7 +2513,35 @@ function createPowerUp(position) {
         shininess: 50
     });
 
-    const powerUp = new THREE.Mesh(powerGeometry, powerMaterial);
+    let powerUp;
+
+    // Create shield-shaped mesh for shield power-ups, spheres for others
+    if (powerType === 'shield') {
+        // Create a shield-shaped mesh
+        const shieldGroup = new THREE.Group();
+
+        // Create the main shield body (a flattened cylinder)
+        const shieldBody = new THREE.Mesh(
+          new THREE.CylinderGeometry(2, 2, 0.2, 132),
+          powerMaterial
+        );
+        shieldBody.rotation.x = Math.PI / 2; // Rotate to face forward
+        shieldGroup.add(shieldBody);
+
+        // Add a raised center to the shield
+        const shieldCenter = new THREE.Mesh(
+          new THREE.SphereGeometry(0.3, 16, 16),
+          powerMaterial
+        );
+        shieldCenter.position.z = -0.05; // Position slightly in front
+        shieldGroup.add(shieldCenter);
+
+        powerUp = shieldGroup;
+    } else {
+        // Create standard sphere for other power-ups
+        const powerGeometry = new THREE.SphereGeometry(0.8, 8, 8);
+        powerUp = new THREE.Mesh(powerGeometry, powerMaterial);
+    }
 
     // Position at enemy death location (passed in as argument)
     powerUp.position.copy(position);
@@ -2526,7 +2554,7 @@ function createPowerUp(position) {
 
     // Store power-up properties
     powerUp.powerType = powerType;
-    powerUp.rotationSpeed = 0.05;
+    powerUp.rotationSpeed = powerType === 'shield' ? 0.08 : 0.05; // Faster rotation for shield
 
     // Store direction vector for movement (accounting for tunnel rotation)
     const direction = new THREE.Vector3(0, 0, 1);
@@ -2880,8 +2908,14 @@ function update(deltaTime) {
         }
 
         // Rotate power-up
-        powerUp.rotation.y += powerUp.rotationSpeed;
-        powerUp.rotation.x += powerUp.rotationSpeed * 0.7;
+        if (powerUp.powerType === 'shield') {
+            // For shield, rotate around z-axis to make it spin like a shield
+            powerUp.rotation.z += powerUp.rotationSpeed;
+        } else {
+            // For other power-ups, rotate around x and y axes
+            powerUp.rotation.y += powerUp.rotationSpeed;
+            powerUp.rotation.x += powerUp.rotationSpeed * 0.7;
+        }
 
         // Pulsate size
         const pulseScale = 1 + 0.1 * Math.sin(performance.now() * 0.005);
@@ -3212,7 +3246,7 @@ function updateHighScoreUI() {
 }
 
 function updateLivesUI() {
-    livesUI.textContent = 'LIVES: ' + lives;
+    livesUI.textContent = '❤️: ' + lives;
 }
 
 function updateLevelUI() {
