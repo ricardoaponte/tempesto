@@ -1744,6 +1744,151 @@ function createCrystalShip() {
     player.scale.set(0.9, 0.9, 0.9); // Slightly smaller overall for crystal ship
 }
 
+// --- Animate Player Ship ---
+function animatePlayerShip(deltaTime) {
+    if (!player) return;
+
+    // Initialize animation properties if not already set
+    if (!player.userData.animationProps) {
+        player.userData.animationProps = {
+            bobPhase: Math.random() * Math.PI * 2, // Random starting phase
+            rotationPhase: Math.random() * Math.PI * 2,
+            pulsePhase: Math.random() * Math.PI * 2,
+            tentaclePhases: [] // For alien ship tentacles
+        };
+
+        // If it's an alien ship, initialize tentacle phases
+        if (shipType === 'alien') {
+            // Find tentacles in the player's children
+            player.children.forEach(child => {
+                // Tentacles are typically tube geometries
+                if (child.geometry && child.geometry.type === 'TubeGeometry') {
+                    player.userData.animationProps.tentaclePhases.push({
+                        object: child,
+                        phase: Math.random() * Math.PI * 2,
+                        speed: 0.02 + Math.random() * 0.03 // Random speed
+                    });
+                }
+            });
+        }
+
+        // If it's a crystal ship, find all crystal shards
+        if (shipType === 'crystal') {
+            player.userData.crystalShards = [];
+            player.children.forEach(child => {
+                // Crystal shards are typically cone or tetrahedron geometries
+                if (child.geometry &&
+                   (child.geometry.type === 'ConeGeometry' ||
+                    child.geometry.type === 'TetrahedronGeometry')) {
+                    player.userData.crystalShards.push({
+                        object: child,
+                        originalScale: child.scale.clone(),
+                        phase: Math.random() * Math.PI * 2,
+                        speed: 0.02 + Math.random() * 0.03 // Random speed
+                    });
+                }
+            });
+        }
+    }
+
+    const props = player.userData.animationProps;
+
+    // Common animation: gentle bobbing motion
+    const bobAmount = 0.03;
+    const bobSpeed = 0.001 * deltaTime;
+    props.bobPhase += bobSpeed;
+    const bobOffset = Math.sin(props.bobPhase) * bobAmount;
+
+    // Store original position
+    const originalY = player.position.y;
+
+    // Apply bob effect
+    player.position.y += bobOffset;
+
+    // Ship-specific animations
+    switch (shipType) {
+        case 'alien':
+            // Animate tentacles
+            if (props.tentaclePhases && props.tentaclePhases.length > 0) {
+                props.tentaclePhases.forEach(tentacle => {
+                    tentacle.phase += tentacle.speed * (deltaTime / 16);
+                    const rotationAmount = Math.sin(tentacle.phase) * 0.2;
+                    tentacle.object.rotation.x = rotationAmount;
+                    tentacle.object.rotation.z = rotationAmount * 0.5;
+                });
+            }
+
+            // Pulse the central eye
+            player.children.forEach(child => {
+                if (child.material && child.material.emissive) {
+                    if (child.material.color.r > 0.9 && child.material.color.g > 0.9) { // Yellow eye
+                        const pulseIntensity = 1.5 + Math.sin(props.pulsePhase) * 0.5;
+                        child.material.emissiveIntensity = pulseIntensity;
+                    }
+                }
+            });
+            props.pulsePhase += 0.03 * (deltaTime / 16);
+            break;
+
+        case 'crystal':
+            // Animate crystal shards - subtle rotation and pulsing
+            if (player.userData.crystalShards) {
+                player.userData.crystalShards.forEach(shard => {
+                    shard.phase += shard.speed * (deltaTime / 16);
+
+                    // Subtle rotation
+                    shard.object.rotation.x += 0.001 * deltaTime;
+                    shard.object.rotation.y += 0.0015 * deltaTime;
+
+                    // Subtle pulsing scale
+                    const pulseScale = 1 + Math.sin(shard.phase) * 0.1;
+                    shard.object.scale.set(
+                        shard.originalScale.x * pulseScale,
+                        shard.originalScale.y * pulseScale,
+                        shard.originalScale.z * pulseScale
+                    );
+                });
+            }
+
+            // Pulse the core crystal
+            player.children.forEach(child => {
+                if (child.material && child.material.emissive) {
+                    if (child.material.color.r > 0.9 && child.material.color.g < 0.3) { // Pink core
+                        const pulseIntensity = 1.5 + Math.sin(props.pulsePhase) * 0.5;
+                        child.material.emissiveIntensity = pulseIntensity;
+                    }
+                }
+            });
+            props.pulsePhase += 0.02 * (deltaTime / 16);
+            break;
+
+        case 'classic':
+        case 'stealth':
+        case 'destroyer':
+        case 'racer':
+            // For other ships, animate engine glow and any emissive parts
+            player.children.forEach(child => {
+                if (child.material && child.material.emissive) {
+                    // Check if it's an engine or emissive part (based on color)
+                    const isEngine = child.material.emissive.r > 0.7 && child.material.emissive.g > 0.3 && child.material.emissive.b < 0.3;
+                    const isEmissive = child.material.emissiveIntensity > 0;
+
+                    if (isEngine || isEmissive) {
+                        const pulseIntensity = child.material.emissiveIntensity * 0.7 +
+                                             (Math.sin(props.pulsePhase) * 0.3 + 0.3) * child.material.emissiveIntensity;
+                        child.material.emissiveIntensity = pulseIntensity;
+                    }
+                }
+            });
+            props.pulsePhase += 0.04 * (deltaTime / 16);
+            break;
+    }
+
+    // Reset the position after applying the bob effect
+    // This ensures we don't accumulate position changes
+    player.position.y = originalY;
+}
+
 // --- Update Player Position ---
 function updatePlayerPosition() {
     // Calculate position based on current lane and web type
@@ -2556,6 +2701,9 @@ function update(deltaTime) {
     if (webMesh) {
         updatePlayerPosition();
     }
+
+    // Animate player ship
+    animatePlayerShip(deltaTime);
 
     // --- Player Movement ---
     let laneChangeAttempt = false;
