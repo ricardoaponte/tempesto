@@ -45,7 +45,7 @@ let isSoundEnabled = true; // Default to sound on
 
 // Web Configuration
 let NUM_LANES = 16;
-const WEB_DEPTH = 160;
+const WEB_DEPTH = 60;
 const WEB_RADIUS = 9;
 let LANE_ANGLE_STEP = (Math.PI * 2) / NUM_LANES;
 let webType = 'circle';
