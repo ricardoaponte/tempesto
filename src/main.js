@@ -491,7 +491,8 @@ const sounds = {
         fire: 'assets/sounds/laser6quick-47339.mp3',
         explode: 'assets/sounds/explosion-8-bit-14-314686.wav',
         powerUp: 'assets/sounds/collect-points-190037.mp3',
-        bomb: 'assets/sounds/blast-37988.mp3'
+        bomb: 'assets/sounds/blast-37988.mp3',
+        baseHit: 'assets/sounds/hit-sound-effect-12445.mp3'
     },
 
     // Initialize all sounds
@@ -2560,7 +2561,7 @@ function createPowerUp(position) {
 }
 
 // --- Create Explosion Effect ---
-function createExplosion(position, color) {
+function createExplosion(position, color, sound = 'explode') {
     const particleCount = 15;
     const explosionGroup = new THREE.Group();
     explosionGroup.position.copy(position);
@@ -2608,7 +2609,7 @@ function createExplosion(position, color) {
     explosions.push(explosionGroup);
 
     // Play explosion sound
-    sounds.play('explode');
+    sounds.play(sound);
 
     return explosionGroup;
 }
@@ -2856,7 +2857,7 @@ function update(deltaTime) {
                 clearTimeout(powerUpTimer);
 
                 // Visual effect for shield hit
-                createExplosion(enemy.position, 0x0088ff);
+                createExplosion(enemy.position, 0x0088ff, 'baseHit');
             }
 
             scene.remove(enemy);
@@ -3029,7 +3030,7 @@ function loseLife() {
     updateLivesUI();
 
     // Visual indication
-    createExplosion(player.position, 0xff0000);
+    createExplosion(player.position, 0xff0000, 'baseHit');
 
     // Make player flash
     let flashCount = 0;
