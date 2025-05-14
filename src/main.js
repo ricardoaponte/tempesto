@@ -3697,8 +3697,8 @@ function renderLeaderboard(targetElement = leaderboardTable) {
         <tbody>
     `;
 
-    // Add table rows
-    leaderboard.forEach((entry, index) => {
+    // Add table rows - show only top 5 leaders
+    leaderboard.slice(0, 5).forEach((entry, index) => {
         const isHighlighted = (isNewHighScore && index === newScoreRank) ? 'highlight' : '';
         html += `
         <tr class="${isHighlighted}">
