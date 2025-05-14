@@ -62,6 +62,8 @@ const COLLISION_Z_TOLERANCE = 1.0;
 const POWER_UP_CHANCE = 0.15; // 15% chance of power-up spawn per enemy kill
 const POWER_UP_DURATION = 10000; // 10 seconds
 const BOMB_POINTS = 3000;
+const MAX_SHOTS = 10;
+
 // Configurable Settings
 let playerLaneChangeRate = 6;
 let currentEnemySpeed = 0.08;
@@ -726,14 +728,14 @@ async function init() {
     // if (nextLevelButton) nextLevelButton.addEventListener('click', nextLevel);
 
     // Ship selection listeners - works during gameplay to change ship on the fly
-    if (shipSelect) shipSelect.addEventListener('change', function() {
+    if (shipSelect) shipSelect.addEventListener('change', function () {
         // Update the in-game selector to match
         if (gameShipSelect) gameShipSelect.value = shipSelect.value;
         changeShipType(shipSelect.value);
     });
 
     // In-game ship selector
-    if (gameShipSelect) gameShipSelect.addEventListener('change', function() {
+    if (gameShipSelect) gameShipSelect.addEventListener('change', function () {
         // Update the menu selector to match
         if (shipSelect) shipSelect.value = gameShipSelect.value;
         changeShipType(gameShipSelect.value);
@@ -1778,7 +1780,7 @@ function animatePlayerShip(deltaTime) {
             player.children.forEach(child => {
                 // Crystal shards are typically cone or tetrahedron geometries
                 if (child.geometry &&
-                   (child.geometry.type === 'ConeGeometry' ||
+                  (child.geometry.type === 'ConeGeometry' ||
                     child.geometry.type === 'TetrahedronGeometry')) {
                     player.userData.crystalShards.push({
                         object: child,
@@ -1843,9 +1845,9 @@ function animatePlayerShip(deltaTime) {
                     // Subtle pulsing scale
                     const pulseScale = 1 + Math.sin(shard.phase) * 0.1;
                     shard.object.scale.set(
-                        shard.originalScale.x * pulseScale,
-                        shard.originalScale.y * pulseScale,
-                        shard.originalScale.z * pulseScale
+                      shard.originalScale.x * pulseScale,
+                      shard.originalScale.y * pulseScale,
+                      shard.originalScale.z * pulseScale
                     );
                 });
             }
@@ -1875,7 +1877,7 @@ function animatePlayerShip(deltaTime) {
 
                     if (isEngine || isEmissive) {
                         const pulseIntensity = child.material.emissiveIntensity * 0.7 +
-                                             (Math.sin(props.pulsePhase) * 0.3 + 0.3) * child.material.emissiveIntensity;
+                          (Math.sin(props.pulsePhase) * 0.3 + 0.3) * child.material.emissiveIntensity;
                         child.material.emissiveIntensity = pulseIntensity;
                     }
                 }
@@ -2294,7 +2296,7 @@ function createProjectile(isSuperProjectile = false) {
     if (gameState !== 'playing' || isPaused) return;
 
     // Limit standard projectiles (unless super power active)
-    if (!isSuperProjectile && !activePowerUp && projectiles.length > 5) return;
+    if (!isSuperProjectile && !activePowerUp && projectiles.length > MAX_SHOTS) return;
 
     const projectileGeometry = new THREE.BoxGeometry(0.3, 0.3, 2);
 
@@ -3028,21 +3030,18 @@ function update(deltaTime) {
 
                 // Special behavior for bomber enemy
                 if (enemy.enemyType === 'bomber') {
-                    // Always drop a bomb powerup
-                    const bombPowerUp = createPowerUp(enemy.position);
+                    // Directly add a bomb to the player's inventory without creating a prop
+                    bombs++;
+                    updateBombsUI();
 
-                    // Force it to be a bomb
-                    if (bombPowerUp) {
-                        // Add a bomb to the player's inventory
-                        bombs++;
-                        updateBombsUI();
+                    // Show message
+                    showMessage("💣 ACQUIRED!", 0xff8800);
 
-                        // Show message
-                        showMessage("💣 ACQUIRED!", 0xff8800);
+                    // Play power-up sound
+                    sounds.play('powerUp');
 
-                        // Play power-up sound
-                        sounds.play('powerUp');
-                    }
+                    // Create explosion effect for visual feedback
+                    createExplosion(enemy.position, 0xff8800);
                 }
                 // Normal chance to spawn power-up for other enemy types
                 else if (Math.random() < POWER_UP_CHANCE || enemy.enemyType === 'special') {
@@ -3204,7 +3203,7 @@ function addScore(points) {
         const newBombs = currentMilestone - lastBombMilestone;
 
         // Add bombs, but don't exceed the maximum of 30000000
-        bombs = Math.min(bombs + newBombs, 3000000);
+        bombs = Math.min(bombs + newBombs, 30);
 
         // Update the last milestone
         lastBombMilestone = currentMilestone;
@@ -3623,11 +3622,11 @@ async function loadLeaderboard() {
             } else {
                 // Initialize with default values if nothing exists
                 leaderboard = [
-                    { initials: 'CPU', score: 5000 },
-                    { initials: 'BOT', score: 4000 },
-                    { initials: 'AI', score: 3000 },
-                    { initials: 'PRO', score: 2000 },
-                    { initials: 'MAX', score: 1000 }
+                    {initials: 'CPU', score: 5000},
+                    {initials: 'BOT', score: 4000},
+                    {initials: 'AI', score: 3000},
+                    {initials: 'PRO', score: 2000},
+                    {initials: 'MAX', score: 1000}
                 ];
                 // Save defaults to localStorage
                 localStorage.setItem(STORAGE_KEY_LEADERBOARD, JSON.stringify(leaderboard));
