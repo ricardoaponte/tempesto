@@ -90,8 +90,9 @@ let activePowerUp = null;
 let powerUpTimer = 0;
 let lastFrameTime = 0;
 
-// Bomb variables
-let bombs = 0; // Start with 3 bombs
+// Bomb and shield variables
+let bombs = 0; // Start with 0 bombs
+let shields = 0; // Start with 0 shields
 let lastBombMilestone = 0; // Track the last score milestone for bomb rewards
 
 // --- UI Elements ---
@@ -100,7 +101,7 @@ const scoreUI = document.getElementById('score');
 const highScoreUI = document.getElementById('high-score');
 const livesUI = document.getElementById('lives');
 const bombsUI = document.getElementById('bombs');
-const powerUpUI = document.getElementById('active-power');
+const shieldsUI = document.getElementById('shields');
 const levelUI = document.getElementById('current-level');
 const pauseScreen = document.getElementById('pause-screen');
 const gameOverScreen = document.getElementById('game-over');
@@ -519,7 +520,6 @@ const sounds = {
 
                 // Wait for all sounds to load
                 await Promise.all(loadPromises);
-                console.log('All sounds loaded successfully');
                 this.initialized = true;
             } catch (error) {
                 console.error('Failed to initialize sounds:', error);
@@ -537,7 +537,6 @@ const sounds = {
 
             const checkForManager = () => {
                 if (window.audioWorkletManager) {
-                    console.log('AudioWorkletManager is now available');
                     resolve(true);
                     return;
                 }
@@ -574,7 +573,6 @@ const sounds = {
                     // Load all sounds
                     await this.init();
 
-                    console.log('Audio system initialized');
                 } catch (error) {
                     console.error('Failed to initialize audio system:', error);
                 }
@@ -625,7 +623,6 @@ const sounds = {
 
                 // Play the sound
                 const result = window.audioWorkletManager.playSound(sound, {volume: 0.5});
-                console.log('Sound play result:', result);
             } catch (e) {
                 console.error("Exception when trying to play sound:", e);
                 this.initialized = false;
@@ -686,9 +683,6 @@ async function init() {
 
     // Initial state: show menu, hide game UI/game over
     if (uiElement) uiElement.style.display = 'none';
-
-    const powerUpsElement = document.getElementById('power-ups');
-    if (powerUpsElement) powerUpsElement.style.display = 'none';
 
     const levelIndicatorElement = document.getElementById('level-indicator');
     if (levelIndicatorElement) levelIndicatorElement.style.display = 'none';
@@ -2067,6 +2061,7 @@ function startGame() {
         highScoreForm.style.display = 'none';
     }
     bombs = 0; // Reset bombs to 0
+    shields = 0; // Reset shields to 0
     lastBombMilestone = 0; // Reset last bomb milestone
 
 
@@ -2084,11 +2079,10 @@ function startGame() {
     updateHighScoreUI();
     updateLivesUI();
     updateLevelUI();
-    updatePowerUpUI();
     updateBombsUI();
+    updateShieldsUI();
 
     uiElement.style.display = 'block';
-    document.getElementById('power-ups').style.display = 'block';
     document.getElementById('level-indicator').style.display = 'block';
     gameOverScreen.style.display = 'none';
     // We don't need to hide the level complete screen anymore as it's not shown
@@ -2260,7 +2254,6 @@ function restartGame() {
     gameOverScreen.style.display = 'none';
     menuElement.style.display = 'block';
     uiElement.style.display = 'none';
-    document.getElementById('power-ups').style.display = 'none';
     document.getElementById('level-indicator').style.display = 'none';
 
     player.visible = false;
@@ -2489,7 +2482,7 @@ function createEnemy(enemyType = 'regular') {
 
 // --- Create Power-Up ---
 function createPowerUp(position) {
-    const powerTypes = ['rapidFire', 'extraLife', 'shield', 'superProjectile'];
+    const powerTypes = ['rapidFire', 'extraLife', 'superProjectile'];
     const powerType = powerTypes[Math.floor(Math.random() * powerTypes.length)];
 
     // Create power-up object
@@ -2504,9 +2497,6 @@ function createPowerUp(position) {
         case 'extraLife':
             powerColor = 0x00FFAA;
             break; // Bright Teal
-        case 'shield':
-            powerColor = 0x00DDFF;
-            break; // Bright Cyan
         case 'superProjectile':
             powerColor = 0xFF00CC;
             break; // Hot Pink
@@ -2616,13 +2606,23 @@ function createExplosion(position, color, sound = 'explode') {
 
 // --- Apply Power-Up ---
 function applyPowerUp(powerType) {
+    // Handle shield as a countable resource, not a power-up
+    if (powerType === 'shield') {
+        // Increment shield count
+        shields++;
+        updateShieldsUI();
+
+        // Play power-up sound
+        sounds.play('powerUp');
+        return;
+    }
+
     // Clear any existing power-up
     if (activePowerUp) {
         clearTimeout(powerUpTimer);
     }
 
     activePowerUp = powerType;
-    updatePowerUpUI();
 
     // Apply power-up effect
     switch (powerType) {
@@ -2634,9 +2634,6 @@ function applyPowerUp(powerType) {
             updateLivesUI();
             activePowerUp = null; // Immediate effect
             break;
-        case 'shield':
-            // Shield is handled in collision detection
-            break;
         case 'superProjectile':
             // Super projectiles handled in projectile creation and collision
             break;
@@ -2644,10 +2641,11 @@ function applyPowerUp(powerType) {
 
     // Set timeout to clear power-up after duration (except extraLife which is immediate)
     if (powerType !== 'extraLife') {
+        // RapidFire lasts for 5 seconds, other power-ups for the standard duration
+        const duration = powerType === 'rapidFire' ? 5000 : POWER_UP_DURATION;
         powerUpTimer = setTimeout(() => {
             activePowerUp = null;
-            updatePowerUpUI();
-        }, POWER_UP_DURATION);
+        }, duration);
     }
 
     // Play power-up sound
@@ -2847,14 +2845,13 @@ function update(deltaTime) {
 
         // Check if enemy reached the player's end
         if (enemy.position.z > ENEMY_END_Z) {
-            // Player loses a life if not shielded
-            if (activePowerUp !== 'shield') {
+            // Player loses a life if no shields available
+            if (shields <= 0) {
                 loseLife();
             } else {
                 // Shield absorbs one hit
-                activePowerUp = null;
-                updatePowerUpUI();
-                clearTimeout(powerUpTimer);
+                shields--;
+                updateShieldsUI();
 
                 // Visual effect for shield hit
                 createExplosion(enemy.position, 0x0088ff, 'baseHit');
@@ -3083,7 +3080,6 @@ function endGame() {
     // Show game over screen
     gameOverScreen.style.display = 'block';
     uiElement.style.display = 'none';
-    document.getElementById('power-ups').style.display = 'none';
     document.getElementById('level-indicator').style.display = 'none';
 
     // Clear game objects
@@ -3152,8 +3148,18 @@ function addScore(points) {
         // Award a new bomb for each milestone passed
         const newBombs = currentMilestone - lastBombMilestone;
 
-        // Add bombs, but don't exceed the maximum of 30000000
+        // Add bombs, but don't exceed the maximum of 30
         bombs = Math.min(bombs + newBombs, 30);
+
+        // Award a shield for every 2 bomb milestones (every 2000 points)
+        if (currentMilestone % 2 === 0 && currentMilestone > 0) {
+            // Add a shield, but don't exceed the maximum of 5
+            shields = Math.min(shields + 1, 5);
+            updateShieldsUI();
+
+            // Visual feedback for getting a new shield
+            showMessage("NEW 🛡️ ACQUIRED!", 0x00ffff);
+        }
 
         // Update the last milestone
         lastBombMilestone = currentMilestone;
@@ -3213,28 +3219,12 @@ function updateLevelUI() {
     levelUI.textContent = 'LEVEL: ' + level;
 }
 
-function updatePowerUpUI() {
-    let powerText = 'POWER: ';
-
-    switch (activePowerUp) {
-        case 'rapidFire':
-            powerText += 'RAPID FIRE';
-            break;
-        case 'shield':
-            powerText += 'SHIELD';
-            break;
-        case 'superProjectile':
-            powerText += 'SUPER SHOT';
-            break;
-        default:
-            powerText += 'NONE';
-    }
-
-    powerUpUI.textContent = powerText;
-}
-
 function updateBombsUI() {
     bombsUI.textContent = '💣: ' + bombs;
+}
+
+function updateShieldsUI() {
+    shieldsUI.textContent = '🛡️: ' + shields;
 }
 
 let fpsValues = [];
@@ -3466,24 +3456,19 @@ function applyGameSettings() {
 // --- Setup Audio Initialization on User Interaction ---
 // Add event listeners to initialize audio on first user interaction
 const initAudioOnInteraction = async (event) => {
-    console.log('User interaction detected, initializing audio...');
-
     // First, directly try to resume the audio context if it exists
     if (window.audioWorkletManager && window.audioWorkletManager.audioContext) {
         try {
-            console.log('AudioContext exists, attempting to resume directly after user interaction');
             const state = window.audioWorkletManager.audioContext.state;
-            console.log('Current AudioContext state:', state);
 
             if (state === 'suspended') {
                 await window.audioWorkletManager.audioContext.resume();
-                console.log('AudioContext resumed directly, new state:', window.audioWorkletManager.audioContext.state);
             }
         } catch (error) {
             console.error('Failed to resume AudioContext directly:', error);
         }
     } else {
-        console.log('AudioWorkletManager or AudioContext not available yet');
+        console.error('AudioWorkletManager or AudioContext not available yet');
     }
 
     // Then continue with normal sound initialization
@@ -3502,7 +3487,6 @@ const initAudioOnInteraction = async (event) => {
                 gain.connect(context.destination);
                 oscillator.start(0);
                 oscillator.stop(0.1); // Very short duration
-                console.log('Played silent sound to unblock audio');
             }
         }
     } catch (error) {
@@ -3514,7 +3498,6 @@ const initAudioOnInteraction = async (event) => {
     document.removeEventListener('keydown', initAudioOnInteraction);
     document.removeEventListener('touchstart', initAudioOnInteraction);
 
-    console.log('Audio initialization complete, removed event listeners');
 };
 
 // Add event listeners for common user interactions
@@ -3525,7 +3508,6 @@ document.addEventListener('touchstart', initAudioOnInteraction);
 // Function to change ship type during gameplay
 function changeShipType(newShipType) {
     if (newShipType && newShipType !== shipType) {
-        console.log(`Changing ship from ${shipType} to ${newShipType}`);
         shipType = newShipType;
 
         // Update dropdown in case this was called programmatically
