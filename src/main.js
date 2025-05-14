@@ -2384,17 +2384,6 @@ function createEnemy(enemyType = 'regular') {
             });
             points = 150;
             break;
-        case 'splitting':
-            // Splitting enemy (purple octahedron)
-            enemyGeometry = new THREE.OctahedronGeometry(1.2);
-            enemyMaterial = new THREE.MeshPhongMaterial({
-                color: 0x8800ff,
-                emissive: 0x440088,
-                emissiveIntensity: 0.4,
-                shininess: 25
-            });
-            points = 250;
-            break;
         case 'bomber':
             // Bomb-dropping enemy (orange dodecahedron)
             enemyGeometry = new THREE.DodecahedronGeometry(1.2);
@@ -2784,16 +2773,13 @@ function update(deltaTime) {
             // 5% chance for slow enemy
             enemyType = 'slow';
         } else if (randomValue < 0.10) {
-            // 5% chance for splitting enemy
-            enemyType = 'splitting';
-        } else if (randomValue < 0.15) {
             // 5% chance for bomber enemy
             enemyType = 'bomber';
-        } else if (randomValue < 0.25) {
+        } else if (randomValue < 0.20) {
             // 10% chance for special enemy
             enemyType = 'special';
         } else {
-            // 75% chance for regular enemy
+            // 80% chance for regular enemy
             enemyType = 'regular';
         }
 
@@ -2814,9 +2800,6 @@ function update(deltaTime) {
                 break;
             case 'slow':
                 speedMultiplier = 0.3; // Slow enemies are very slow
-                break;
-            case 'splitting':
-                speedMultiplier = 1.2; // Splitting enemies are slightly faster
                 break;
             case 'bomber':
                 speedMultiplier = 0.8; // Bomber enemies are slightly slower
@@ -2846,9 +2829,6 @@ function update(deltaTime) {
             case 'special':
                 enemy.rotation.y += 0.03;
                 enemy.rotation.x += 0.02;
-                break;
-            case 'splitting':
-                enemy.rotation.z += 0.04;
                 break;
             case 'bomber':
                 enemy.rotation.x += 0.03;
@@ -2980,9 +2960,6 @@ function update(deltaTime) {
                     case 'slow':
                         explosionColor = 0x0000ff; // Blue
                         break;
-                    case 'splitting':
-                        explosionColor = 0x8800ff; // Purple
-                        break;
                     case 'bomber':
                         explosionColor = 0xff8800; // Orange
                         break;
@@ -2993,40 +2970,6 @@ function update(deltaTime) {
                 // Create explosion effect
                 createExplosion(enemy.position, explosionColor);
 
-                // Special behavior for splitting enemy
-                if (enemy.enemyType === 'splitting') {
-                    // Create two smaller enemies
-                    let newEnemiesCreated = 0;
-                    for (let k = 0; k < 2; k++) {
-                        // Only spawn new enemies if we haven't reached the enemy limit
-                        if (enemies.length < enemiesRequired - enemiesKilled + 5) {
-                            const newEnemy = createEnemy('regular');
-
-                            // Position the new enemy at the destroyed enemy's position
-                            newEnemy.position.copy(enemy.position);
-
-                            // Slightly offset the position
-                            newEnemy.position.x += (k === 0 ? 0.5 : -0.5);
-                            newEnemy.position.y += (k === 0 ? 0.5 : -0.5);
-
-                            // Make the new enemy smaller
-                            newEnemy.scale.set(0.7, 0.7, 0.7);
-                            newEnemy.initialScale = 0.7;
-
-                            // Reduce points for the smaller enemies
-                            newEnemy.points = 50;
-
-                            // Count new enemies created
-                            newEnemiesCreated++;
-                        }
-                    }
-
-                    // Update enemiesRequired to account for the new enemies
-                    enemiesRequired += newEnemiesCreated;
-
-                    // Show message
-                    //showMessage("ENEMY SPLIT!", 0x8800ff);
-                }
 
                 // Special behavior for bomber enemy
                 if (enemy.enemyType === 'bomber') {
