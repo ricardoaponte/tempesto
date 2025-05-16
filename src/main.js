@@ -191,6 +191,66 @@ function loadSoundState() {
     }
 }
 
+// --- Fullscreen Toggle ---
+let isFullscreen = false;
+
+function toggleFullscreen() {
+    if (!document.fullscreenElement &&
+        !document.mozFullScreenElement &&
+        !document.webkitFullscreenElement &&
+        !document.msFullscreenElement) {
+        // Enter fullscreen
+        if (document.documentElement.requestFullscreen) {
+            document.documentElement.requestFullscreen();
+        } else if (document.documentElement.msRequestFullscreen) {
+            document.documentElement.msRequestFullscreen();
+        } else if (document.documentElement.mozRequestFullScreen) {
+            document.documentElement.mozRequestFullScreen();
+        } else if (document.documentElement.webkitRequestFullscreen) {
+            document.documentElement.webkitRequestFullscreen(Element.ALLOW_KEYBOARD_INPUT);
+        }
+        isFullscreen = true;
+    } else {
+        // Exit fullscreen
+        if (document.exitFullscreen) {
+            document.exitFullscreen();
+        } else if (document.msExitFullscreen) {
+            document.msExitFullscreen();
+        } else if (document.mozCancelFullScreen) {
+            document.mozCancelFullScreen();
+        } else if (document.webkitExitFullscreen) {
+            document.webkitExitFullscreen();
+        }
+        isFullscreen = false;
+    }
+
+    updateFullscreenToggleButton();
+}
+
+function updateFullscreenToggleButton() {
+    // Update menu fullscreen toggle button
+    const fullscreenToggleButton = document.getElementById('fullscreen-toggle');
+    if (fullscreenToggleButton) {
+        fullscreenToggleButton.textContent = isFullscreen ? 'ON' : 'OFF';
+        if (isFullscreen) {
+            fullscreenToggleButton.classList.remove('off');
+        } else {
+            fullscreenToggleButton.classList.add('off');
+        }
+    }
+
+    // Update in-game fullscreen toggle button
+    const gameFullscreenToggleButton = document.getElementById('game-fullscreen-toggle');
+    if (gameFullscreenToggleButton) {
+        gameFullscreenToggleButton.textContent = isFullscreen ? 'ON' : 'OFF';
+        if (isFullscreen) {
+            gameFullscreenToggleButton.classList.remove('off');
+        } else {
+            gameFullscreenToggleButton.classList.add('off');
+        }
+    }
+}
+
 // --- Toggle Sound ---
 function toggleSound() {
     isSoundEnabled = !isSoundEnabled;
@@ -3798,6 +3858,20 @@ async function handleScoreSubmit() {
         }
     }
 }
+
+// --- Add event listeners for fullscreen toggle buttons ---
+const fullscreenToggleButton = document.getElementById('fullscreen-toggle');
+if (fullscreenToggleButton) {
+    fullscreenToggleButton.addEventListener('click', toggleFullscreen);
+}
+
+const gameFullscreenToggleButton = document.getElementById('game-fullscreen-toggle');
+if (gameFullscreenToggleButton) {
+    gameFullscreenToggleButton.addEventListener('click', toggleFullscreen);
+}
+
+// Initialize fullscreen toggle buttons
+updateFullscreenToggleButton();
 
 // --- Start the Game ---
 init();

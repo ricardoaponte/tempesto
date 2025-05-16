@@ -482,6 +482,11 @@ canvas {
     transform: translateX(-50%);
 }
 
+#game-fullscreen-toggle {
+    left: calc(50% + 60px);
+    transform: translateX(-50%);
+}
+
 /* Mobile styles for game buttons */
 @media (max-width: 800px), (max-height: 600px) {
     #instructions-button {
@@ -495,6 +500,16 @@ canvas {
     }
 
     #game-sound-toggle {
+        padding: 5px 10px;
+        width: 30px;
+        height: 30px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        border-radius: 50%;
+    }
+
+    #game-fullscreen-toggle {
         padding: 5px 10px;
         width: 30px;
         height: 30px;
