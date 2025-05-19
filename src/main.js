@@ -86,7 +86,11 @@ let newScoreRank = -1;
 let enemySpawnTimer = 0;
 let playerCurrentLaneIndex = Math.floor(NUM_LANES / 2);
 let lastLaneChangeFrame = 0;
-let activePowerUp = null;
+// Track active power-ups with an object
+let activePowerUps = {
+    rapidFire: false,
+    superProjectile: false
+};
 let powerUpTimer = 0;
 let lastFrameTime = 0;
 
@@ -374,7 +378,7 @@ function setupMobileControls() {
                 e.preventDefault();
                 keyState[' '] = true;
                 if (gameState === 'playing') {
-                    createProjectile(activePowerUp === 'superProjectile');
+                    createProjectile(activePowerUps.superProjectile);
                 }
             });
 
@@ -2106,7 +2110,9 @@ function startGame() {
     enemySpawnTimer = 0;
     playerCurrentLaneIndex = Math.floor(NUM_LANES / 2);
     lastLaneChangeFrame = 0;
-    activePowerUp = null;
+    // Reset power-ups
+    activePowerUps.rapidFire = false;
+    activePowerUps.superProjectile = false;
     powerUpTimer = 0;
 
     // Reset leaderboard state
@@ -2355,8 +2361,8 @@ function clearGameObjects() {
 function createProjectile(isSuperProjectile = false) {
     if (gameState !== 'playing' || isPaused) return;
 
-    // Limit standard projectiles (unless super power active)
-    if (!isSuperProjectile && !activePowerUp && projectiles.length > MAX_SHOTS) return;
+    // Limit standard projectiles (unless a power-up is active)
+    if (!isSuperProjectile && !activePowerUps.rapidFire && !activePowerUps.superProjectile && projectiles.length > MAX_SHOTS) return;
 
     const projectileGeometry = new THREE.BoxGeometry(0.3, 0.3, 2);
 
@@ -2705,35 +2711,43 @@ function applyPowerUp(powerType) {
         return;
     }
 
-    // Clear any existing power-up
-    if (activePowerUp) {
-        clearTimeout(powerUpTimer);
-    }
-
-    activePowerUp = powerType;
-
     // Apply power-up effect
     switch (powerType) {
         case 'rapidFire':
-            // Rapid fire handled in update loop
+            // Clear any existing rapidFire timer
+            if (activePowerUps.rapidFire) {
+                clearTimeout(activePowerUps.rapidFireTimer);
+            }
+
+            // Set rapidFire to active
+            activePowerUps.rapidFire = true;
+
+            // Set timer to clear rapidFire after duration
+            const rapidFireDuration = 5000; // 5 seconds
+            activePowerUps.rapidFireTimer = setTimeout(() => {
+                activePowerUps.rapidFire = false;
+            }, rapidFireDuration);
             break;
+
         case 'extraLife':
             lives++;
             updateLivesUI();
-            activePowerUp = null; // Immediate effect
             break;
-        case 'superProjectile':
-            // Super projectiles handled in projectile creation and collision
-            break;
-    }
 
-    // Set timeout to clear power-up after duration (except extraLife which is immediate)
-    if (powerType !== 'extraLife') {
-        // RapidFire lasts for 5 seconds, other power-ups for the standard duration
-        const duration = powerType === 'rapidFire' ? 5000 : POWER_UP_DURATION;
-        powerUpTimer = setTimeout(() => {
-            activePowerUp = null;
-        }, duration);
+        case 'superProjectile':
+            // Clear any existing superProjectile timer
+            if (activePowerUps.superProjectile) {
+                clearTimeout(activePowerUps.superProjectileTimer);
+            }
+
+            // Set superProjectile to active
+            activePowerUps.superProjectile = true;
+
+            // Set timer to clear superProjectile after duration
+            activePowerUps.superProjectileTimer = setTimeout(() => {
+                activePowerUps.superProjectile = false;
+            }, POWER_UP_DURATION);
+            break;
     }
 
     // Play power-up sound
@@ -2808,8 +2822,8 @@ function update(deltaTime) {
     }
 
     // Handle automatic firing for rapid fire power-up
-    if (activePowerUp === 'rapidFire' && currentFrame % 12 === 0) {
-        createProjectile();
+    if (activePowerUps.rapidFire && currentFrame % 12 === 0) {
+        createProjectile(activePowerUps.superProjectile);
     }
 
     // --- Update Projectiles ---
@@ -3185,10 +3199,14 @@ function endGame() {
     // Play game over sound
     sounds.play('explode');
 
-    // Clear power-up timer
-    if (activePowerUp) {
-        clearTimeout(powerUpTimer);
-        activePowerUp = null;
+    // Clear power-up timers
+    if (activePowerUps.rapidFire) {
+        clearTimeout(activePowerUps.rapidFireTimer);
+        activePowerUps.rapidFire = false;
+    }
+    if (activePowerUps.superProjectile) {
+        clearTimeout(activePowerUps.superProjectileTimer);
+        activePowerUps.superProjectile = false;
     }
 
 
@@ -3211,10 +3229,14 @@ function completedLevel() {
     // Play level complete sound
     // sounds.levelComplete.play();
 
-    // Clear power-up timer
-    if (activePowerUp) {
-        clearTimeout(powerUpTimer);
-        activePowerUp = null;
+    // Clear power-up timers
+    if (activePowerUps.rapidFire) {
+        clearTimeout(activePowerUps.rapidFireTimer);
+        activePowerUps.rapidFire = false;
+    }
+    if (activePowerUps.superProjectile) {
+        clearTimeout(activePowerUps.superProjectileTimer);
+        activePowerUps.superProjectile = false;
     }
 
     // Show level up message
@@ -3430,7 +3452,7 @@ function onKeyDown(event) {
     // Handle firing
     if (gameState === 'playing' && event.key === ' ') {
         // Create super projectile if power-up is active
-        createProjectile(activePowerUp === 'superProjectile');
+        createProjectile(activePowerUps.superProjectile);
     }
 
     // Handle bomb activation
