@@ -2425,26 +2425,32 @@ function createEnemy(enemyType = 'regular') {
     let points = 100;
     let emoji = '👾'; // Default emoji (alien monster)
 
+    // Arrays of emojis for each enemy type
+    const regularEmojis = ['👾', '👽', '👻', '🤖', '🛸', '🚀'];
+    const specialEmojis = ['👹', '👺', '🤡', '👻', '💀', '🌞'];
+    const slowEmojis = ['🐢', '🐌', '🦥', '🐘', '🦛', '🐊'];
+    const bomberEmojis = ['💣'];
+
     switch (enemyType) {
         case 'special':
             // Special enemy (red)
-            emoji = '👹'; // Ogre
+            emoji = specialEmojis[Math.floor(Math.random() * specialEmojis.length)];
             initialScale = 1.2;
             points = 200;
             break;
         case 'slow':
             // Very slow enemy (blue)
-            emoji = '🐢'; // Turtle
+            emoji = slowEmojis[Math.floor(Math.random() * slowEmojis.length)];
             points = 150;
             break;
         case 'bomber':
             // Bomb-dropping enemy (orange)
-            emoji = '💣'; // Bomb
+            emoji = bomberEmojis[Math.floor(Math.random() * bomberEmojis.length)];
             points = 300;
             break;
         default:
             // Regular enemy (green)
-            emoji = '👾'; // Alien monster
+            emoji = regularEmojis[Math.floor(Math.random() * regularEmojis.length)];
             break;
     }
 
@@ -2454,9 +2460,9 @@ function createEnemy(enemyType = 'regular') {
     canvas.height = 128;
     const context = canvas.getContext('2d');
     context.font = '100px Arial';
-    context.textAlign = 'center';
-    context.textBaseline = 'middle';
-    context.fillText(emoji, 64, 64);
+    context.textAlign = 'left';
+    context.textBaseline = 'top';
+    context.fillText(emoji, 0, 0);
 
     // Create a texture from the canvas
     const texture = new THREE.CanvasTexture(canvas);
@@ -2556,63 +2562,47 @@ function createPowerUp(position) {
     const powerTypes = ['rapidFire', 'extraLife', 'superProjectile', 'shield'];
     const powerType = powerTypes[Math.floor(Math.random() * powerTypes.length)];
 
-    // Color based on power-up type - using bright, distinct colors
-    let powerColor;
+    // Emojis for each power-up type
+    let emoji;
     switch (powerType) {
         case 'rapidFire':
-            powerColor = 0xFFD700;
-            break; // Gold
+            emoji = '🔥';
+            break;
         case 'extraLife':
-            powerColor = 0x00FFAA;
-            break; // Bright Teal
+            emoji = '❤️';
+            break;
         case 'superProjectile':
-            powerColor = 0xFF00CC;
-            break; // Hot Pink
+            emoji = '💥';
+            break;
         case 'shield':
-            powerColor = 0x00DDFF;
-            break; // Bright Cyan
+            emoji = '🛡️';
+            break;
         default:
-            powerColor = 0xFFFFFF; // White
+            emoji = '🎁'; // Default gift box
     }
 
-    const powerMaterial = new THREE.MeshPhongMaterial({
-        color: powerColor,
-        emissive: powerColor,
-        emissiveIntensity: 0.5,
-        transparent: true,
-        opacity: 0.9,
-        shininess: 50
+    // Create a canvas to render the emoji
+    const canvas = document.createElement('canvas');
+    canvas.width = 128;
+    canvas.height = 128;
+    const context = canvas.getContext('2d');
+    context.font = '100px Arial';
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.fillText(emoji, 64, 64);
+
+    // Create a texture from the canvas
+    const texture = new THREE.CanvasTexture(canvas);
+
+    // Create a sprite material with the emoji texture
+    const material = new THREE.SpriteMaterial({
+        map: texture,
+        transparent: true
     });
 
-    let powerUp;
-
-    // Create shield-shaped mesh for shield power-ups, spheres for others
-    if (powerType === 'shield') {
-        // Create a shield-shaped mesh
-        const shieldGroup = new THREE.Group();
-
-        // Create the main shield body (a flattened cylinder)
-        const shieldBody = new THREE.Mesh(
-          new THREE.CylinderGeometry(2, 2, 0.2, 132),
-          powerMaterial
-        );
-        shieldBody.rotation.x = Math.PI / 2; // Rotate to face forward
-        shieldGroup.add(shieldBody);
-
-        // Add a raised center to the shield
-        const shieldCenter = new THREE.Mesh(
-          new THREE.SphereGeometry(0.3, 16, 16),
-          powerMaterial
-        );
-        shieldCenter.position.z = -0.05; // Position slightly in front
-        shieldGroup.add(shieldCenter);
-
-        powerUp = shieldGroup;
-    } else {
-        // Create standard sphere for other power-ups
-        const powerGeometry = new THREE.SphereGeometry(0.8, 8, 8);
-        powerUp = new THREE.Mesh(powerGeometry, powerMaterial);
-    }
+    // Create the sprite
+    const powerUp = new THREE.Sprite(material);
+    powerUp.scale.set(2, 2, 1);
 
     // Position at enemy death location (passed in as argument)
     powerUp.position.copy(position);
@@ -2626,6 +2616,11 @@ function createPowerUp(position) {
     // Store power-up properties
     powerUp.powerType = powerType;
     powerUp.rotationSpeed = powerType === 'shield' ? 0.08 : 0.05; // Faster rotation for shield
+
+    // Set random rotation speeds for the power-up
+    powerUp.rotationSpeedX = (Math.random() - 0.5) * 0.04;
+    powerUp.rotationSpeedY = (Math.random() - 0.5) * 0.04;
+    powerUp.rotationSpeedZ = (Math.random() - 0.5) * 0.04;
 
     // Store direction vector for movement (accounting for tunnel rotation)
     const direction = new THREE.Vector3(0, 0, 1);
@@ -2979,19 +2974,14 @@ function update(deltaTime) {
             powerUp.position.z += speed;
         }
 
-        // Rotate power-up
-        if (powerUp.powerType === 'shield') {
-            // For shield, rotate around z-axis to make it spin like a shield
-            powerUp.rotation.z += powerUp.rotationSpeed;
-        } else {
-            // For other power-ups, rotate around x and y axes
-            powerUp.rotation.y += powerUp.rotationSpeed;
-            powerUp.rotation.x += powerUp.rotationSpeed * 0.7;
-        }
+        // Rotate power-up using individual rotation speeds
+        powerUp.rotation.x += powerUp.rotationSpeedX;
+        powerUp.rotation.y += powerUp.rotationSpeedY;
+        powerUp.rotation.z += powerUp.rotationSpeedZ;
 
-        // Pulsate size
+        // Pulsate size while maintaining the sprite scale (2x2)
         const pulseScale = 1 + 0.1 * Math.sin(performance.now() * 0.005);
-        powerUp.scale.set(pulseScale, pulseScale, pulseScale);
+        powerUp.scale.set(2 * pulseScale, 2 * pulseScale, 1);
 
         // Check if power-up is collected
         if (powerUp.position.z > PLAYER_Z - 1 &&
