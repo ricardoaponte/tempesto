@@ -2421,80 +2421,59 @@ function createProjectile(isSuperProjectile = false) {
 function createEnemy(enemyType = 'regular') {
     if (gameState !== 'playing' || isPaused) return;
 
-    let enemyGeometry, enemyMaterial;
     let initialScale = 1.0;
     let points = 100;
-
-    // Color and points based on enemy type
-    let color, emissive, emissiveIntensity, shininess;
+    let emoji = '👾'; // Default emoji (alien monster)
 
     switch (enemyType) {
         case 'special':
             // Special enemy (red)
-            color = 0xff0000;
-            emissive = 0x880000;
-            emissiveIntensity = 0.5;
-            shininess = 30;
+            emoji = '👹'; // Ogre
             initialScale = 1.2;
             points = 200;
             break;
         case 'slow':
             // Very slow enemy (blue)
-            color = 0x0000ff;
-            emissive = 0x000088;
-            emissiveIntensity = 0.4;
-            shininess = 25;
+            emoji = '🐢'; // Turtle
             points = 150;
             break;
         case 'bomber':
             // Bomb-dropping enemy (orange)
-            color = 0xff8800;
-            emissive = 0x884400;
-            emissiveIntensity = 0.4;
-            shininess = 25;
+            emoji = '💣'; // Bomb
             points = 300;
             break;
         default:
             // Regular enemy (green)
-            color = 0x00ff00;
-            emissive = 0x008800;
-            emissiveIntensity = 0.3;
-            shininess = 20;
+            emoji = '👾'; // Alien monster
             break;
     }
 
-    // Random shape selection (excluding spheres which are reserved for props)
-    const shapeType = Math.floor(Math.random() * 6);
+    // Create a canvas to render the emoji
+    const canvas = document.createElement('canvas');
+    canvas.width = 128;
+    canvas.height = 128;
+    const context = canvas.getContext('2d');
+    context.font = '100px Arial';
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.fillText(emoji, 64, 64);
 
-    switch (shapeType) {
-        case 0:
-            enemyGeometry = new THREE.TorusGeometry(1);
-            break;
-        case 1:
-            enemyGeometry = new THREE.BoxGeometry(1.5, 1.5, 1.5);
-            break;
-        case 2:
-            enemyGeometry = new THREE.TetrahedronGeometry(1.2);
-            break;
-        case 3:
-            enemyGeometry = new THREE.DodecahedronGeometry(1.2);
-            break;
-        case 4:
-            enemyGeometry = new THREE.OctahedronGeometry(1.2);
-            break;
-        case 5:
-            enemyGeometry = new THREE.TorusKnotGeometry(1);
-            break;
-    }
+    // Create a texture from the canvas
+    const texture = new THREE.CanvasTexture(canvas);
 
-    enemyMaterial = new THREE.MeshPhongMaterial({
-        color: color,
-        emissive: emissive,
-        emissiveIntensity: emissiveIntensity,
-        shininess: shininess
+    // Create a sprite material with the emoji texture
+    const material = new THREE.SpriteMaterial({
+        map: texture,
+        transparent: true
     });
 
-    const enemy = new THREE.Mesh(enemyGeometry, enemyMaterial);
+    // Create the sprite
+    const enemy = new THREE.Sprite(material);
+    enemy.scale.set(3, 3, 1);
+
+    // Store the enemy type and points
+    enemy.enemyType = enemyType;
+    enemy.points = points;
 
     // Set random rotation speeds for the enemy
     enemy.rotationSpeedX = (Math.random() - 0.5) * 0.06;
@@ -2955,7 +2934,9 @@ function update(deltaTime) {
         // Pulsating animation
         const pulseScale = enemy.initialScale + Math.sin(enemy.pulsePhase) * 0.1;
         enemy.pulsePhase += 0.05;
-        enemy.scale.set(pulseScale, pulseScale, pulseScale);
+        // Apply pulsating effect while maintaining the larger sprite scale (3x3)
+        const scaleFactor = 3 * pulseScale / enemy.initialScale;
+        enemy.scale.set(scaleFactor, scaleFactor, 1);
 
         // Apply rotation to all enemies using their individual rotation speeds
         enemy.rotation.x += enemy.rotationSpeedX;
