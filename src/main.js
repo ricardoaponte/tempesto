@@ -2425,55 +2425,81 @@ function createEnemy(enemyType = 'regular') {
     let initialScale = 1.0;
     let points = 100;
 
-    // Geometry and material based on enemy type
+    // Color and points based on enemy type
+    let color, emissive, emissiveIntensity, shininess;
+
     switch (enemyType) {
         case 'special':
-            // Special enemy (red torus knot)
-            enemyGeometry = new THREE.TorusKnotGeometry(1.2);
-            enemyMaterial = new THREE.MeshPhongMaterial({
-                color: 0xff0000,
-                emissive: 0x880000,
-                emissiveIntensity: 0.5,
-                shininess: 30
-            });
+            // Special enemy (red)
+            color = 0xff0000;
+            emissive = 0x880000;
+            emissiveIntensity = 0.5;
+            shininess = 30;
             initialScale = 1.2;
             points = 200;
             break;
         case 'slow':
-            // Very slow enemy (blue cube)
-            enemyGeometry = new THREE.BoxGeometry(1.5, 1.5, 1.5);
-            enemyMaterial = new THREE.MeshPhongMaterial({
-                color: 0x0000ff,
-                emissive: 0x000088,
-                emissiveIntensity: 0.4,
-                shininess: 25
-            });
+            // Very slow enemy (blue)
+            color = 0x0000ff;
+            emissive = 0x000088;
+            emissiveIntensity = 0.4;
+            shininess = 25;
             points = 150;
             break;
         case 'bomber':
-            // Bomb-dropping enemy (orange dodecahedron)
-            enemyGeometry = new THREE.DodecahedronGeometry(1.2);
-            enemyMaterial = new THREE.MeshPhongMaterial({
-                color: 0xff8800,
-                emissive: 0x884400,
-                emissiveIntensity: 0.4,
-                shininess: 25
-            });
+            // Bomb-dropping enemy (orange)
+            color = 0xff8800;
+            emissive = 0x884400;
+            emissiveIntensity = 0.4;
+            shininess = 25;
             points = 300;
             break;
         default:
-            // Regular enemy (green torus)
-            enemyGeometry = new THREE.TorusGeometry(1);
-            enemyMaterial = new THREE.MeshPhongMaterial({
-                color: 0x00ff00,
-                emissive: 0x008800,
-                emissiveIntensity: 0.3,
-                shininess: 20
-            });
+            // Regular enemy (green)
+            color = 0x00ff00;
+            emissive = 0x008800;
+            emissiveIntensity = 0.3;
+            shininess = 20;
             break;
     }
 
+    // Random shape selection (excluding spheres which are reserved for props)
+    const shapeType = Math.floor(Math.random() * 6);
+
+    switch (shapeType) {
+        case 0:
+            enemyGeometry = new THREE.TorusGeometry(1);
+            break;
+        case 1:
+            enemyGeometry = new THREE.BoxGeometry(1.5, 1.5, 1.5);
+            break;
+        case 2:
+            enemyGeometry = new THREE.TetrahedronGeometry(1.2);
+            break;
+        case 3:
+            enemyGeometry = new THREE.DodecahedronGeometry(1.2);
+            break;
+        case 4:
+            enemyGeometry = new THREE.OctahedronGeometry(1.2);
+            break;
+        case 5:
+            enemyGeometry = new THREE.TorusKnotGeometry(1);
+            break;
+    }
+
+    enemyMaterial = new THREE.MeshPhongMaterial({
+        color: color,
+        emissive: emissive,
+        emissiveIntensity: emissiveIntensity,
+        shininess: shininess
+    });
+
     const enemy = new THREE.Mesh(enemyGeometry, enemyMaterial);
+
+    // Set random rotation speeds for the enemy
+    enemy.rotationSpeedX = (Math.random() - 0.5) * 0.06;
+    enemy.rotationSpeedY = (Math.random() - 0.5) * 0.06;
+    enemy.rotationSpeedZ = (Math.random() - 0.5) * 0.06;
 
     // Random lane
     const laneIndex = Math.floor(Math.random() * NUM_LANES);
@@ -2931,19 +2957,10 @@ function update(deltaTime) {
         enemy.pulsePhase += 0.05;
         enemy.scale.set(pulseScale, pulseScale, pulseScale);
 
-        // Special rotation effects based on enemy type
-        switch (enemy.enemyType) {
-            case 'special':
-                enemy.rotation.y += 0.03;
-                enemy.rotation.x += 0.02;
-                break;
-            case 'bomber':
-                enemy.rotation.x += 0.03;
-                break;
-            case 'slow':
-                enemy.rotation.y += 0.01;
-                break;
-        }
+        // Apply rotation to all enemies using their individual rotation speeds
+        enemy.rotation.x += enemy.rotationSpeedX;
+        enemy.rotation.y += enemy.rotationSpeedY;
+        enemy.rotation.z += enemy.rotationSpeedZ;
 
         // Check if enemy reached the player's end
         if (enemy.position.z > ENEMY_END_Z) {
