@@ -2426,9 +2426,9 @@ function createEnemy(enemyType = 'regular') {
     let emoji = '👾'; // Default emoji (alien monster)
 
     // Arrays of emojis for each enemy type
-    const regularEmojis = ['👾', '👽', '👻', '🤖', '🛸', '🚀'];
-    const specialEmojis = ['👹', '👺', '🤡', '👻', '💀', '🌞'];
-    const slowEmojis = ['🐢', '🐌', '🦥', '🐘', '🦛', '🐊'];
+    const regularEmojis = ['👾', '🛸', '🚀'];
+    const specialEmojis = ['👹', '👺', '👻', '🌞'];
+    const slowEmojis = ['🐢', '🐌', '🦥'];
     const bomberEmojis = ['💣'];
 
     switch (enemyType) {
@@ -2482,9 +2482,9 @@ function createEnemy(enemyType = 'regular') {
     enemy.points = points;
 
     // Set random rotation speeds for the enemy
-    enemy.rotationSpeedX = (Math.random() - 0.5) * 0.06;
-    enemy.rotationSpeedY = (Math.random() - 0.5) * 0.06;
-    enemy.rotationSpeedZ = (Math.random() - 0.5) * 0.06;
+    enemy.rotationSpeedX = (Math.random() - 0.5) * 0.1;
+    enemy.rotationSpeedY = (Math.random() - 0.5) * 0.1;
+    enemy.rotationSpeedZ = (Math.random() - 0.5) * 0.1;
 
     // Random lane
     const laneIndex = Math.floor(Math.random() * NUM_LANES);
