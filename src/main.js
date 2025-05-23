@@ -1,3 +1,11 @@
+// --- Imports ---
+import { CONFIG, COMPUTED, INITIAL_STATE, INITIAL_POWER_UPS, INITIAL_WEB_COLOR, INITIAL_ROTATION, getLaneAngleStep, getCenterLaneIndex } from './GameConfig.js';
+import { PersistenceManager } from './PersistenceManager.js';
+import { AudioManager } from './AudioManager.js';
+import { LeaderboardManager } from './LeaderboardManager.js';
+import { UI } from './UI.js';
+import { InputHandler } from './InputHandler.js';
+
 // --- Global Variables ---
 let scene, camera, renderer;
 let webMesh;
@@ -7,192 +15,143 @@ const enemies = [];
 const powerUps = [];
 const explosions = [];
 const stars = [];
-const NUM_STARS = 200; // Number of background stars
-const keyState = {};
-let difficulty = 'medium'; // Default difficulty
+// Initialize managers
+const persistenceManager = new PersistenceManager();
+const audioManager = new AudioManager();
+const leaderboardManager = new LeaderboardManager();
+const ui = new UI();
+const inputHandler = new InputHandler();
+
+// Game state variables
+let difficulty = CONFIG.DEFAULTS.DIFFICULTY;
+let shipType = CONFIG.DEFAULTS.SHIP_TYPE;
+let webType = CONFIG.DEFAULTS.WEB_TYPE;
+let tubeWidth = CONFIG.DEFAULTS.TUBE_WIDTH;
 
 // Web color variables
-let webColorHue = 180; // Starting with cyan (180 degrees in HSL)
-const webColorSpeed = 0.1; // Speed of color change
-let shipType = 'classic'; // Default ship type
-
+let webColorHue = INITIAL_WEB_COLOR.hue;
 
 // Mouse tracking variables
-let targetRotationX = 0;
-let targetRotationY = 0;
-let isRotationEnabled = false; // Flag to enable/disable tunnel rotation
-
-// localStorage keys
-const STORAGE_KEY_ROTATION_X = 'tempest3d_rotationX';
-const STORAGE_KEY_ROTATION_Y = 'tempest3d_rotationY';
-const STORAGE_KEY_ROTATION_ENABLED = 'tempest3d_rotationEnabled';
-const STORAGE_KEY_HIGH_SCORE = 'tempest3d_highScore';
-const STORAGE_KEY_SOUND_ENABLED = 'tempest3d_soundEnabled';
-const STORAGE_KEY_LEADERBOARD = 'tempest3d_leaderboard';
+let targetRotationX = INITIAL_ROTATION.targetX;
+let targetRotationY = INITIAL_ROTATION.targetY;
+let isRotationEnabled = INITIAL_ROTATION.enabled;
 
 // Debounce timer for saving rotation state
 let saveRotationTimer = null;
 
 // Game State
-let gameState = 'menu'; // 'menu', 'countdown', 'playing', 'paused', 'gameover', 'levelcomplete'
+let gameState = CONFIG.GAME_STATES.MENU;
 let isPaused = false;
-let countdownTime = 3; // 3-second countdown
+let countdownTime = CONFIG.GAME_FLOW.COUNTDOWN_TIME;
 let countdownStartTime = 0;
 
 // Sound State
-let isSoundEnabled = true; // Default to sound on
+let isSoundEnabled = CONFIG.DEFAULTS.SOUND_ENABLED;
 
-
-// Web Configuration
-let NUM_LANES = 16;
-const WEB_DEPTH = 60;
-const WEB_RADIUS = 9;
-let LANE_ANGLE_STEP = (Math.PI * 2) / NUM_LANES;
-let webType = 'circle';
-let tubeWidth = 'large'; // Options: 'wire', 'small', 'medium', 'large'
-
-// Fixed Z positions
-const PLAYER_Z = WEB_DEPTH / 2;
-const ENEMY_START_Z = -WEB_DEPTH / 2 + 1;
-const ENEMY_END_Z = WEB_DEPTH / 2 - 2;
-
-// Game mechanics
-const PROJECTILE_SPEED = 0.6;
-const COLLISION_Z_TOLERANCE = 1.0;
-const POWER_UP_CHANCE = 0.15; // 15% chance of power-up spawn per enemy kill
-const POWER_UP_DURATION = 10000; // 10 seconds
-const BOMB_POINTS = 3000;
-const MAX_SHOTS = 10;
+// Web Configuration (dynamic values)
+let NUM_LANES = CONFIG.WEB.NUM_LANES;
+let LANE_ANGLE_STEP = COMPUTED.LANE_ANGLE_STEP;
 
 // Configurable Settings
-let playerLaneChangeRate = 6;
-let currentEnemySpeed = 0.08;
-let originalEnemySpeed = 0.08; // Store original speed for returning after acceleration
-let currentEnemySpawnInterval = 50;
-let enemiesPerLevel = 20;
+let playerLaneChangeRate = CONFIG.PLAYER.LANE_CHANGE_RATE;
+let currentEnemySpeed = CONFIG.ENEMIES.SPEED;
+let originalEnemySpeed = CONFIG.ENEMIES.SPEED;
+let currentEnemySpawnInterval = CONFIG.ENEMIES.SPAWN_INTERVAL;
+let enemiesPerLevel = CONFIG.ENEMIES.PER_LEVEL;
 
-// Game stats
-let score = 0;
-let highScore = 0;
-let lives = 3;
-let level = 1;
-let enemiesKilled = 0;
-let enemiesRequired = enemiesPerLevel;
+// Game stats (use INITIAL_STATE)
+let score = INITIAL_STATE.score;
+let highScore = INITIAL_STATE.highScore;
+let lives = INITIAL_STATE.lives;
+let level = INITIAL_STATE.level;
+let enemiesKilled = INITIAL_STATE.enemiesKilled;
+let enemiesRequired = INITIAL_STATE.enemiesRequired;
+let bombs = INITIAL_STATE.bombs;
+let shields = INITIAL_STATE.shields;
+let lastBombMilestone = INITIAL_STATE.lastBombMilestone;
 
-// Leaderboard
-let leaderboard = [];
-let isNewHighScore = false;
-let newScoreRank = -1;
+// Leaderboard variables are now managed by LeaderboardManager
 let enemySpawnTimer = 0;
-let playerCurrentLaneIndex = Math.floor(NUM_LANES / 2);
+let playerCurrentLaneIndex = getCenterLaneIndex();
 let lastLaneChangeFrame = 0;
+
 // Track active power-ups with an object
-let activePowerUps = {
-    rapidFire: false,
-    superProjectile: false
-};
+let activePowerUps = { ...INITIAL_POWER_UPS };
 let powerUpTimer = 0;
 let lastFrameTime = 0;
 
-// Bomb and shield variables
-let bombs = 0; // Start with 0 bombs
-let shields = 0; // Start with 0 shields
-let lastBombMilestone = 0; // Track the last score milestone for bomb rewards
+// UI elements are now managed by the UI class
 
-// --- UI Elements ---
-const uiElement = document.getElementById('ui');
-const scoreUI = document.getElementById('score');
-const highScoreUI = document.getElementById('high-score');
-const livesUI = document.getElementById('lives');
-const bombsUI = document.getElementById('bombs');
-const shieldsUI = document.getElementById('shields');
-const levelUI = document.getElementById('current-level');
-const pauseScreen = document.getElementById('pause-screen');
-const gameOverScreen = document.getElementById('game-over');
-const finalScoreUI = document.getElementById('final-score');
-const finalHighScoreUI = document.getElementById('final-high-score');
-const restartButton = document.getElementById('restart-button');
-const replayButton = document.getElementById('replay-button');
-const menuElement = document.getElementById('menu');
-const speedSelect = document.getElementById('speed-select');
-const difficultySelect = document.getElementById('difficulty-select');
-const webTypeSelect = document.getElementById('web-type-select');
-const tubeWidthSelect = document.getElementById('tube-width-select');
-const livesSelect = document.getElementById('lives-select');
-const shipSelect = document.getElementById('ship-select');
-const gameShipSelect = document.getElementById('game-ship-select');
-const startButton = document.getElementById('start-button');
+// --- Input Callbacks Setup ---
+function setupInputCallbacks() {
+    inputHandler.setCallbacks({
+        fire: () => {
+            if (gameState === CONFIG.GAME_STATES.PLAYING) {
+                createProjectile(activePowerUps.superProjectile);
+            }
+        },
+        bomb: () => {
+            if (gameState === CONFIG.GAME_STATES.PLAYING && !isPaused) {
+                activateBomb();
+            }
+        },
+        pause: () => {
+            if (gameState === CONFIG.GAME_STATES.PLAYING) {
+                const instructionsModal = ui.getElement('instructionsModal');
+                const isInstructionsVisible = instructionsModal && instructionsModal.style.display === 'block';
 
-// Leaderboard elements
-const leaderboardContainer = document.getElementById('leaderboard-container');
-const leaderboardTable = document.getElementById('leaderboard-table');
-const modalLeaderboardTable = document.getElementById('modal-leaderboard-table');
-const leaderboardModal = document.getElementById('leaderboard-modal');
-const showLeaderboardButton = document.getElementById('show-leaderboard-button');
-const closeLeaderboardButton = document.getElementById('close-leaderboard-button');
-const highScoreForm = document.getElementById('high-score-form');
-const playerInitialsInput = document.getElementById('player-initials');
-const submitScoreButton = document.getElementById('submit-score');
-
-
-// --- Save and Load Rotation State ---
-function saveRotationState() {
-    try {
-        localStorage.setItem(STORAGE_KEY_ROTATION_X, targetRotationX);
-        localStorage.setItem(STORAGE_KEY_ROTATION_Y, targetRotationY);
-        localStorage.setItem(STORAGE_KEY_ROTATION_ENABLED, isRotationEnabled);
-    } catch (e) {
-        console.error("Failed to save rotation state to localStorage:", e);
-    }
+                if (!isInstructionsVisible) {
+                    isPaused = !isPaused;
+                    if (isPaused) {
+                        ui.showPauseScreen();
+                        ui.showMenu();
+                    } else {
+                        ui.hidePauseScreen();
+                        ui.hideScreen('menu');
+                        applyGameSettings();
+                    }
+                    ui.updateStartButtonText(gameState);
+                }
+            }
+        }
+    });
 }
 
-// --- Save and Load High Score ---
+
+// --- Persistence Functions (using PersistenceManager) ---
+function saveRotationState() {
+    persistenceManager.saveRotationState(targetRotationX, targetRotationY, isRotationEnabled);
+}
+
 function saveHighScore() {
-    try {
-        localStorage.setItem(STORAGE_KEY_HIGH_SCORE, highScore);
-    } catch (e) {
-        console.error("Failed to save high score to localStorage:", e);
-    }
+    persistenceManager.saveHighScore(highScore);
 }
 
 function loadHighScore() {
-    try {
-        const savedHighScore = localStorage.getItem(STORAGE_KEY_HIGH_SCORE);
-
-        if (savedHighScore !== null) {
-            highScore = parseInt(savedHighScore);
-            updateHighScoreUI();
-        }
-    } catch (e) {
-        console.error("Failed to load high score from localStorage:", e);
-    }
+    highScore = persistenceManager.loadHighScore();
+    updateHighScoreUI();
 }
 
-// --- Save and Load Sound State ---
 function saveSoundState() {
-    try {
-        localStorage.setItem(STORAGE_KEY_SOUND_ENABLED, isSoundEnabled);
-    } catch (e) {
-        console.error("Failed to save sound state to localStorage:", e);
-    }
+    persistenceManager.saveSoundState(isSoundEnabled);
 }
 
 function loadSoundState() {
-    try {
-        const savedSoundState = localStorage.getItem(STORAGE_KEY_SOUND_ENABLED);
-        if (savedSoundState !== null) {
-            isSoundEnabled = savedSoundState === 'true';
+    isSoundEnabled = persistenceManager.loadSoundState();
 
-            // Initialize AudioWorklet manager's sound enabled state
-            if (window.audioWorkletManager) {
-                window.audioWorkletManager.setSoundEnabled(isSoundEnabled);
-            }
-
-            updateSoundToggleButton();
-        }
-    } catch (e) {
-        console.error("Failed to load sound state from localStorage:", e);
+    // Initialize AudioWorklet manager's sound enabled state
+    if (window.audioWorkletManager) {
+        window.audioWorkletManager.setSoundEnabled(isSoundEnabled);
     }
+
+    updateSoundToggleButton();
+}
+
+function loadRotationState() {
+    const rotationState = persistenceManager.loadRotationState();
+    targetRotationX = rotationState.targetRotationX;
+    targetRotationY = rotationState.targetRotationY;
+    isRotationEnabled = rotationState.isRotationEnabled;
 }
 
 // --- Fullscreen Toggle ---
@@ -232,7 +191,9 @@ function toggleFullscreen() {
 }
 
 function updateFullscreenToggleButton() {
-    // Update menu fullscreen toggle button
+    ui.updateFullscreenToggleButton(isFullscreen);
+
+    // Legacy compatibility - keeping some direct DOM access
     const fullscreenToggleButton = document.getElementById('fullscreen-toggle');
     if (fullscreenToggleButton) {
         fullscreenToggleButton.textContent = isFullscreen ? 'ON' : 'OFF';
@@ -270,14 +231,14 @@ function toggleSound() {
 
 // --- Update Start Button Text ---
 function updateStartButtonText() {
-    if (startButton) {
-        startButton.textContent = (gameState === 'playing' && isPaused) ? 'RESUME GAME' : 'START GAME';
-    }
+    ui.updateStartButtonText(gameState);
 }
 
 // --- Update Sound Toggle Buttons ---
 function updateSoundToggleButton() {
-    // Update menu sound toggle button
+    ui.updateSoundToggleButton(isSoundEnabled);
+
+    // Legacy compatibility - keeping some direct DOM access
     const soundToggleButton = document.getElementById('sound-toggle');
     if (soundToggleButton) {
         soundToggleButton.textContent = isSoundEnabled ? 'ON' : 'OFF';
@@ -351,24 +312,24 @@ function setupMobileControls() {
         if (leftButton) {
             leftButton.addEventListener('touchstart', function (e) {
                 e.preventDefault();
-                keyState['ArrowRight'] = true;
+                inputHandler.keyState['ArrowRight'] = true;
             });
 
             leftButton.addEventListener('touchend', function (e) {
                 e.preventDefault();
-                keyState['ArrowRight'] = false;
+                inputHandler.keyState['ArrowRight'] = false;
             });
         }
 
         if (rightButton) {
             rightButton.addEventListener('touchstart', function (e) {
                 e.preventDefault();
-                keyState['ArrowLeft'] = true;
+                inputHandler.keyState['ArrowLeft'] = true;
             });
 
             rightButton.addEventListener('touchend', function (e) {
                 e.preventDefault();
-                keyState['ArrowLeft'] = false;
+                inputHandler.keyState['ArrowLeft'] = false;
             });
         }
 
@@ -376,7 +337,7 @@ function setupMobileControls() {
         if (fireButton) {
             fireButton.addEventListener('touchstart', function (e) {
                 e.preventDefault();
-                keyState[' '] = true;
+                inputHandler.keyState[' '] = true;
                 if (gameState === 'playing') {
                     createProjectile(activePowerUps.superProjectile);
                 }
@@ -384,7 +345,7 @@ function setupMobileControls() {
 
             fireButton.addEventListener('touchend', function (e) {
                 e.preventDefault();
-                keyState[' '] = false;
+                inputHandler.keyState[' '] = false;
             });
         }
 
@@ -410,8 +371,13 @@ function setupMobileControls() {
                     // Only toggle pause if instructions are not visible
                     if (!isInstructionsVisible) {
                         isPaused = !isPaused;
-                        pauseScreen.style.display = isPaused ? 'block' : 'none';
-                        menuElement.style.display = isPaused ? 'block' : 'none';
+                        if (isPaused) {
+                            ui.showPauseScreen();
+                            ui.showMenu();
+                        } else {
+                            ui.hidePauseScreen();
+                            ui.hideScreen('menu');
+                        }
                         updateStartButtonText();
 
                         if (!isPaused) {
@@ -468,8 +434,13 @@ function setupMobileControls() {
 
                         if (!isInstructionsVisible) {
                             isPaused = !isPaused;
-                            pauseScreen.style.display = isPaused ? 'block' : 'none';
-                            menuElement.style.display = isPaused ? 'block' : 'none';
+                            if (isPaused) {
+                                ui.showPauseScreen();
+                                ui.showMenu();
+                            } else {
+                                ui.hidePauseScreen();
+                                ui.hideScreen('menu');
+                            }
                             updateStartButtonText();
 
                             if (!isPaused) {
@@ -503,15 +474,15 @@ function setupMobileControls() {
                     // Determine swipe direction and trigger movement
                     if (swipeDistance < 0) {
                         // Swipe left - move right (inverted)
-                        keyState['ArrowRight'] = true;
+                        inputHandler.keyState['ArrowRight'] = true;
                         setTimeout(() => {
-                            keyState['ArrowRight'] = false;
+                            inputHandler.keyState['ArrowRight'] = false;
                         }, 100);
                     } else {
                         // Swipe right - move left (inverted)
-                        keyState['ArrowLeft'] = true;
+                        inputHandler.keyState['ArrowLeft'] = true;
                         setTimeout(() => {
-                            keyState['ArrowLeft'] = false;
+                            inputHandler.keyState['ArrowLeft'] = false;
                         }, 100);
                     }
                 }
@@ -701,17 +672,22 @@ const sounds = {
 
 // --- Initialization Function ---
 async function init() {
-    // Load high score
+    // Load persistent state
     loadHighScore();
+    loadRotationState();
+    loadSoundState();
 
     // Load leaderboard (async)
-    await loadLeaderboard();
+    await leaderboardManager.loadLeaderboard();
 
-    // Load sound state
-    loadSoundState();
+    // Initialize audio manager
+    await audioManager.initialize();
 
     // Initialize sounds
     sounds.init();
+
+    // Setup input callbacks
+    setupInputCallbacks();
 
     // Scene setup
     scene = new THREE.Scene();
@@ -724,7 +700,7 @@ async function init() {
       0.1,
       1000
     );
-    camera.position.set(0, .6, WEB_DEPTH / 2 + 15);
+    camera.position.set(0, .6, CONFIG.WEB.DEPTH / 2 + 15);
     camera.lookAt(0, 0, 0);
 
     // Renderer setup
@@ -746,15 +722,15 @@ async function init() {
     player.visible = false;
 
     // Initial state: show menu, hide game UI/game over
-    if (uiElement) uiElement.style.display = 'none';
+    ui.hideScreen('ui');
 
     const levelIndicatorElement = document.getElementById('level-indicator');
     if (levelIndicatorElement) levelIndicatorElement.style.display = 'none';
 
-    if (gameOverScreen) gameOverScreen.style.display = 'none';
+    ui.hideScreen('gameOverScreen');
     // We don't need to hide the level complete screen anymore as it's not shown
     // if (levelCompleteScreen) levelCompleteScreen.style.display = 'none';
-    if (menuElement) menuElement.style.display = 'block';
+    ui.showScreen('menu');
 
     const instructionsButton = document.getElementById('instructions-button');
     const instructionsModal = document.getElementById('instructions-modal');
@@ -780,25 +756,30 @@ async function init() {
     window.addEventListener('click', onMouseClick);
 
     // Button listeners
-    if (startButton) startButton.addEventListener('click', startGame);
-    if (restartButton) restartButton.addEventListener('click', restartGame);
-    if (replayButton) replayButton.addEventListener('click', replayGame);
+    ui.addClickListener('startButton', startGame);
+    console.log('startButton listener set.')
+    ui.addClickListener('restartButton', restartGame);
+    ui.addClickListener('replayButton', replayGame);
     // We don't need the next level button anymore as levels continue automatically
     // if (nextLevelButton) nextLevelButton.addEventListener('click', nextLevel);
 
     // Ship selection listeners - works during gameplay to change ship on the fly
-    if (shipSelect) shipSelect.addEventListener('change', function () {
+    ui.addChangeListener('shipSelect', function () {
+        const selectedShip = ui.getSelectedValues().shipType;
         // Update the in-game selector to match
-        if (gameShipSelect) gameShipSelect.value = shipSelect.value;
-        changeShipType(shipSelect.value);
+        ui.setSelectedValues({ shipType: selectedShip });
+        changeShipType(selectedShip);
     });
 
-    // In-game ship selector
-    if (gameShipSelect) gameShipSelect.addEventListener('change', function () {
-        // Update the menu selector to match
-        if (shipSelect) shipSelect.value = gameShipSelect.value;
-        changeShipType(gameShipSelect.value);
-    });
+    // In-game ship selector (if it exists)
+    const gameShipSelect = ui.getElement('gameShipSelect');
+    if (gameShipSelect) {
+        gameShipSelect.addEventListener('change', function () {
+            // Update the menu selector to match
+            ui.setSelectedValues({ shipType: gameShipSelect.value });
+            changeShipType(gameShipSelect.value);
+        });
+    }
 
     // Sound toggle buttons listeners
     const soundToggleButton = document.getElementById('sound-toggle');
@@ -808,9 +789,9 @@ async function init() {
     if (gameSoundToggleButton) gameSoundToggleButton.addEventListener('click', toggleSound);
 
     // Leaderboard button listeners
-    if (showLeaderboardButton) showLeaderboardButton.addEventListener('click', showLeaderboard);
-    if (closeLeaderboardButton) closeLeaderboardButton.addEventListener('click', hideLeaderboard);
-    if (submitScoreButton) submitScoreButton.addEventListener('click', handleScoreSubmit);
+    ui.addClickListener('showLeaderboardButton', showLeaderboard);
+    ui.addClickListener('closeLeaderboardButton', hideLeaderboard);
+    ui.addClickListener('submitScore', handleScoreSubmit);
 
 
     // Start the animation loop
@@ -844,7 +825,7 @@ function createStars() {
     }
 
     // Create new stars
-    for (let i = 0; i < NUM_STARS; i++) {
+    for (let i = 0; i < CONFIG.NUM_STARS; i++) {
         // Random star size
         const size = Math.random() * 0.15 + 0.05;
 
@@ -943,12 +924,12 @@ function createWeb(type, customSides) {
 
     const extrudeSettings = {
         steps: 1,
-        depth: WEB_DEPTH,
+        depth: CONFIG.WEB.DEPTH,
         bevelEnabled: false
     };
 
     const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
-    geometry.translate(0, 0, -WEB_DEPTH / 2);
+    geometry.translate(0, 0, -CONFIG.WEB.DEPTH / 2);
 
     // Create enhanced wireframe with tube-like effect
     const edges = new THREE.EdgesGeometry(geometry);
@@ -990,7 +971,7 @@ function createWeb(type, customSides) {
             default:
                 tubeRadiusMultiplier = 0.02; // Default to medium
         }
-        const tubeRadius = WEB_RADIUS * tubeRadiusMultiplier;
+        const tubeRadius = CONFIG.WEB.RADIUS * tubeRadiusMultiplier;
         const tubeGeometry = new THREE.TubeGeometry(
           path,
           1,              // tubularSegments
@@ -1033,10 +1014,10 @@ function createWeb(type, customSides) {
 // Helper functions to create different web shapes
 function createPolygonWeb(sides) {
     const shape = new THREE.Shape();
-    shape.moveTo(WEB_RADIUS, 0);
+    shape.moveTo(CONFIG.WEB.RADIUS, 0);
     for (let i = 1; i <= sides; i++) {
         const angle = (i / sides) * Math.PI * 2;
-        shape.lineTo(WEB_RADIUS * Math.cos(angle), WEB_RADIUS * Math.sin(angle));
+        shape.lineTo(CONFIG.WEB.RADIUS * Math.cos(angle), CONFIG.WEB.RADIUS * Math.sin(angle));
     }
     return shape;
 }
@@ -1963,11 +1944,11 @@ function updatePlayerPosition() {
 
     // For circle or random polygon
     angle = playerCurrentLaneIndex * LANE_ANGLE_STEP;
-    x = WEB_RADIUS * Math.cos(angle);
-    y = WEB_RADIUS * Math.sin(angle);
+    x = CONFIG.WEB.RADIUS * Math.cos(angle);
+    y = CONFIG.WEB.RADIUS * Math.sin(angle);
 
     // Create a position vector
-    const position = new THREE.Vector3(x, y, PLAYER_Z);
+    const position = new THREE.Vector3(x, y, CONFIG.PLAYER.Z_POSITION);
 
     // Apply tunnel rotation to player position
     if (webMesh) {
@@ -2063,12 +2044,12 @@ function setGameSettings(speed, difficultyParam, web, width, lives) {
 }
 
 // --- Start Game Function ---
-function startGame() {
+async function startGame() {
     // If the game is paused, resume it
     if (gameState === 'playing' && isPaused) {
         isPaused = false;
-        pauseScreen.style.display = 'none';
-        menuElement.style.display = 'none';
+        ui.hideScreen('pauseScreen');
+        ui.hideScreen('menu');
         updateStartButtonText();
         return;
     }
@@ -2076,24 +2057,32 @@ function startGame() {
     // Otherwise, don't start a new game if already playing or in countdown
     if (gameState === 'playing' || gameState === 'countdown') return;
 
-    // Initialize audio after user interaction
-    sounds.initializeAudio();
+    console.log('Starting game, initializing audio...');
+
+    // Initialize audio after user interaction (non-blocking)
+    sounds.initializeAudio().then(() => {
+        console.log('Audio initialization completed');
+    }).catch(error => {
+        console.error('Audio initialization failed:', error);
+    });
 
     // Get selected settings
-    const selectedSpeed = speedSelect.value;
-    const selectedDifficulty = difficultySelect.value;
-    const selectedWebType = webTypeSelect.value;
-    const selectedTubeWidth = tubeWidthSelect.value;
-    const selectedLives = livesSelect.value;
+    const selectedValues = ui.getSelectedValues();
+    const selectedSpeed = selectedValues.speed;
+    const selectedDifficulty = selectedValues.difficulty;
+    const selectedWebType = selectedValues.webType;
+    const selectedTubeWidth = selectedValues.tubeWidth;
+    const selectedLives = selectedValues.lives;
     // Update global ship type
-    shipType = shipSelect.value;
+    shipType = selectedValues.shipType;
 
     // Sync the in-game ship selector with the menu selection
+    const gameShipSelect = ui.getElement('gameShipSelect');
     if (gameShipSelect) {
         gameShipSelect.value = shipType;
     }
 
-    setGameSettings(selectedSpeed, selectedDifficulty, selectedWebType, selectedTubeWidth, selectedLives);
+    setGameSettings(selectedValues.speed, selectedValues.difficulty, selectedValues.webType, selectedValues.tubeWidth, selectedValues.lives);
 
     // Always start with a pentagon (5 sides) at level 1, regardless of user selection
     createWeb('pentagon');
@@ -2116,13 +2105,14 @@ function startGame() {
     powerUpTimer = 0;
 
     // Reset leaderboard state
-    isNewHighScore = false;
-    newScoreRank = -1;
+    leaderboardManager.resetHighScoreStatus();
 
     // Hide leaderboard elements
+    const leaderboardContainer = ui.getElement('leaderboardContainer');
     if (leaderboardContainer) {
         leaderboardContainer.style.display = 'none';
     }
+    const highScoreForm = ui.getElement('highScoreForm');
     if (highScoreForm) {
         highScoreForm.style.display = 'none';
     }
@@ -2148,12 +2138,12 @@ function startGame() {
     updateBombsUI();
     updateShieldsUI();
 
-    uiElement.style.display = 'block';
+    ui.showScreen('ui');
     document.getElementById('level-indicator').style.display = 'block';
-    gameOverScreen.style.display = 'none';
+    ui.hideScreen('gameOverScreen');
     // We don't need to hide the level complete screen anymore as it's not shown
     // levelCompleteScreen.style.display = 'none';
-    menuElement.style.display = 'none';
+    ui.hideScreen('menu');
 
     // Mobile device detection and touch controls setup
     setupMobileControls();
@@ -2242,11 +2232,11 @@ function updateCountdown() {
 }
 
 // --- Reset for Next Level ---
-function nextLevel() {
+async function nextLevel() {
     if (gameState !== 'levelcomplete') return;
 
     // Initialize audio after user interaction
-    sounds.initializeAudio();
+    await sounds.initializeAudio();
 
     // Increase level
     level++;
@@ -2312,14 +2302,14 @@ function nextLevel() {
 }
 
 // --- Restart Game Function ---
-function restartGame() {
+async function restartGame() {
     // Initialize audio after user interaction
-    sounds.initializeAudio();
+    await sounds.initializeAudio();
 
     gameState = 'menu';
-    gameOverScreen.style.display = 'none';
-    menuElement.style.display = 'block';
-    uiElement.style.display = 'none';
+    ui.hideScreen('gameOverScreen');
+    ui.showScreen('menu');
+    ui.hideScreen('ui');
     document.getElementById('level-indicator').style.display = 'none';
 
     player.visible = false;
@@ -2327,12 +2317,12 @@ function restartGame() {
 }
 
 // --- Replay Game Function ---
-function replayGame() {
+async function replayGame() {
     // Initialize audio after user interaction
-    sounds.initializeAudio();
+    await sounds.initializeAudio();
 
     // Hide game over screen
-    gameOverScreen.style.display = 'none';
+    ui.hideScreen('gameOverScreen');
 
     // Start a new game directly
     startGame();
@@ -2362,7 +2352,7 @@ function createProjectile(isSuperProjectile = false) {
     if (gameState !== 'playing' || isPaused) return;
 
     // Limit standard projectiles (unless a power-up is active)
-    if (!isSuperProjectile && !activePowerUps.rapidFire && !activePowerUps.superProjectile && projectiles.length > MAX_SHOTS) return;
+    if (!isSuperProjectile && !activePowerUps.rapidFire && !activePowerUps.superProjectile && projectiles.length > CONFIG.PROJECTILES.MAX_SHOTS) return;
 
     const projectileGeometry = new THREE.BoxGeometry(0.3, 0.3, 2);
 
@@ -2494,11 +2484,11 @@ function createEnemy(enemyType = 'regular') {
     let angle;
 
     angle = laneIndex * LANE_ANGLE_STEP;
-    x = WEB_RADIUS * Math.cos(angle);
-    y = WEB_RADIUS * Math.sin(angle);
+    x = CONFIG.WEB.RADIUS * Math.cos(angle);
+    y = CONFIG.WEB.RADIUS * Math.sin(angle);
 
     // Create a position vector
-    const position = new THREE.Vector3(x, y, ENEMY_START_Z);
+    const position = new THREE.Vector3(x, y, CONFIG.ENEMIES.START_Z);
 
     // Apply tunnel rotation to enemy position
     if (webMesh) {
@@ -2746,7 +2736,7 @@ function applyPowerUp(powerType) {
             // Set timer to clear superProjectile after duration
             activePowerUps.superProjectileTimer = setTimeout(() => {
                 activePowerUps.superProjectile = false;
-            }, POWER_UP_DURATION);
+            }, CONFIG.POWER_UPS.DURATION);
             break;
     }
 
@@ -2759,7 +2749,7 @@ function updateWebColor(deltaTime) {
     if (!webMesh) return;
 
     // Update the hue value
-    webColorHue = (webColorHue + webColorSpeed * deltaTime) % 360;
+    webColorHue = (webColorHue + CONFIG.WEB.COLOR_SPEED * deltaTime) % 360;
 
     // Convert HSL to hex color
     const color = new THREE.Color().setHSL(webColorHue / 360, 1, 0.5);
@@ -2781,7 +2771,7 @@ function update(deltaTime) {
     }
 
     // Handle acceleration with up arrow key
-    if (keyState['ArrowUp']) {
+    if (inputHandler.isKeyPressed('ArrowUp')) {
         // Accelerate enemies and powerups
         currentEnemySpeed = originalEnemySpeed * 10; // Double the speed when up arrow is pressed
     } else {
@@ -2807,11 +2797,13 @@ function update(deltaTime) {
     let laneChangeAttempt = false;
     let newLaneIndex = playerCurrentLaneIndex;
 
-    if (keyState['ArrowLeft']) {
-        newLaneIndex = (playerCurrentLaneIndex + 1) % NUM_LANES;
-        laneChangeAttempt = true;
-    } else if (keyState['ArrowRight']) {
-        newLaneIndex = (playerCurrentLaneIndex - 1 + NUM_LANES) % NUM_LANES;
+    const movementDirection = inputHandler.getMovementInput();
+    if (movementDirection !== 0) {
+        if (movementDirection < 0) {
+            newLaneIndex = (playerCurrentLaneIndex + 1) % NUM_LANES;
+        } else {
+            newLaneIndex = (playerCurrentLaneIndex - 1 + NUM_LANES) % NUM_LANES;
+        }
         laneChangeAttempt = true;
     }
 
@@ -2832,12 +2824,12 @@ function update(deltaTime) {
 
         // Move projectile along its direction vector (accounting for tunnel rotation)
         if (projectile.direction) {
-            projectile.position.x += projectile.direction.x * PROJECTILE_SPEED;
-            projectile.position.y += projectile.direction.y * PROJECTILE_SPEED;
-            projectile.position.z += projectile.direction.z * PROJECTILE_SPEED;
+            projectile.position.x += projectile.direction.x * CONFIG.PROJECTILES.SPEED;
+            projectile.position.y += projectile.direction.y * CONFIG.PROJECTILES.SPEED;
+            projectile.position.z += projectile.direction.z * CONFIG.PROJECTILES.SPEED;
         } else {
             // Fallback for projectiles created before this update
-            projectile.position.z -= PROJECTILE_SPEED;
+            projectile.position.z -= CONFIG.PROJECTILES.SPEED;
         }
 
         // Super projectiles have a trailing effect
@@ -2861,7 +2853,7 @@ function update(deltaTime) {
         }
 
         // Remove projectile if offscreen
-        if (projectile.position.z < ENEMY_START_Z - 5) {
+        if (projectile.position.z < CONFIG.ENEMIES.START_Z - 5) {
             scene.remove(projectile);
             projectiles.splice(i, 1);
         }
@@ -2939,7 +2931,7 @@ function update(deltaTime) {
         enemy.rotation.z += enemy.rotationSpeedZ;
 
         // Check if enemy reached the player's end
-        if (enemy.position.z > ENEMY_END_Z) {
+        if (enemy.position.z > CONFIG.ENEMIES.END_Z) {
             // Player loses a life if no shields available
             if (shields <= 0) {
                 loseLife();
@@ -2984,7 +2976,7 @@ function update(deltaTime) {
         powerUp.scale.set(2 * pulseScale, 2 * pulseScale, 1);
 
         // Check if power-up is collected
-        if (powerUp.position.z > PLAYER_Z - 1 &&
+        if (powerUp.position.z > CONFIG.PLAYER.Z_POSITION - 1 &&
           Math.abs(powerUp.position.x - player.position.x) < 2 &&
           Math.abs(powerUp.position.y - player.position.y) < 2) {
 
@@ -2997,7 +2989,7 @@ function update(deltaTime) {
         }
 
         // Remove if past player
-        if (powerUp.position.z > PLAYER_Z + 5) {
+        if (powerUp.position.z > CONFIG.PLAYER.Z_POSITION + 5) {
             scene.remove(powerUp);
             powerUps.splice(i, 1);
         }
@@ -3044,7 +3036,7 @@ function update(deltaTime) {
 
             // Check if in same lane and close enough on Z axis
             if (projectile.laneIndex === enemy.laneIndex &&
-              Math.abs(projectile.position.z - enemy.position.z) < COLLISION_Z_TOLERANCE) {
+              Math.abs(projectile.position.z - enemy.position.z) < CONFIG.COLLISION.Z_TOLERANCE) {
 
                 // Collision detected!
                 const hitPoints = enemy.points;
@@ -3087,7 +3079,7 @@ function update(deltaTime) {
                     createExplosion(enemy.position, 0xff8800);
                 }
                 // Normal chance to spawn power-up for other enemy types
-                else if (Math.random() < POWER_UP_CHANCE || enemy.enemyType === 'special') {
+                else if (Math.random() < CONFIG.POWER_UPS.CHANCE || enemy.enemyType === 'special') {
                     createPowerUp(enemy.position);
                 }
 
@@ -3148,34 +3140,40 @@ function endGame() {
     saveRotationState();
 
     gameState = 'gameover';
-    finalScoreUI.textContent = 'FINAL SCORE: ' + score;
-    finalHighScoreUI.textContent = 'HIGH SCORE: ' + highScore;
+
+    // Update final score display using UI class
+    const finalScoreUI = ui.getElement('finalScore');
+    const finalHighScoreUI = ui.getElement('finalHighScore');
+    if (finalScoreUI) finalScoreUI.textContent = 'FINAL SCORE: ' + score.toLocaleString();
+    if (finalHighScoreUI) finalHighScoreUI.textContent = 'HIGH SCORE: ' + highScore.toLocaleString();
 
     // Check if player's score qualifies for the leaderboard
-    const isLeaderboardScore = checkHighScore(score);
+    const isLeaderboardScore = leaderboardManager.checkHighScore(score);
 
     // Show high score form if it's a new high score
+    const highScoreForm = ui.getElement('highScoreForm');
     if (highScoreForm) {
         highScoreForm.style.display = isLeaderboardScore ? 'block' : 'none';
 
-        if (isLeaderboardScore && playerInitialsInput) {
+        if (isLeaderboardScore) {
             // Focus on the input field and select any existing text
             setTimeout(() => {
-                playerInitialsInput.focus();
-                playerInitialsInput.select();
+                ui.focusPlayerInitials();
             }, 300);
         }
     }
 
     // Update and display the leaderboard
-    renderLeaderboard();
+    const leaderboardHTML = leaderboardManager.generateLeaderboardHTML();
+    ui.updateLeaderboard(leaderboardHTML, false);
+    const leaderboardContainer = ui.getElement('leaderboardContainer');
     if (leaderboardContainer) {
         leaderboardContainer.style.display = 'block';
     }
 
     // Show game over screen
-    gameOverScreen.style.display = 'block';
-    uiElement.style.display = 'none';
+    ui.showScreen('gameOverScreen');
+    ui.hideScreen('ui');
     document.getElementById('level-indicator').style.display = 'none';
 
     // Clear game objects
@@ -3247,7 +3245,7 @@ function addScore(points) {
     }
 
     // Check for bomb reward milestone (every 1000 points)
-    const currentMilestone = Math.floor(score / BOMB_POINTS);
+    const currentMilestone = Math.floor(score / CONFIG.SCORING.BOMB_POINTS);
     if (currentMilestone > lastBombMilestone) {
         // Award a new bomb for each milestone passed
         const newBombs = currentMilestone - lastBombMilestone;
@@ -3308,27 +3306,27 @@ function showMessage(text, color) {
 }
 
 function updateScoreUI() {
-    scoreUI.textContent = 'SCORE: ' + score;
+    ui.updateScore(score);
 }
 
 function updateHighScoreUI() {
-    highScoreUI.textContent = 'HIGH SCORE: ' + highScore;
+    ui.updateHighScore(highScore);
 }
 
 function updateLivesUI() {
-    livesUI.textContent = '❤️: ' + lives;
+    ui.updateLives(lives);
 }
 
 function updateLevelUI() {
-    levelUI.textContent = 'LEVEL: ' + level;
+    ui.updateLevel(level);
 }
 
 function updateBombsUI() {
-    bombsUI.textContent = '💣: ' + bombs;
+    ui.updateBombs(bombs);
 }
 
 function updateShieldsUI() {
-    shieldsUI.textContent = '🛡️: ' + shields;
+    ui.updateShields(shields);
 }
 
 let fpsValues = [];
@@ -3393,7 +3391,7 @@ function animate() {
     if (!isPaused) {
         // Handle countdown state
         if (gameState === 'countdown') {
-            updateCountdown(deltaTime);
+            updateCountdown();
         }
         // Handle playing state
         else if (gameState === 'playing') {
@@ -3435,7 +3433,7 @@ function onWindowResize() {
 }
 
 function onKeyDown(event) {
-    keyState[event.key] = true;
+    inputHandler.keyState[event.key] = true;
 
     // Handle firing
     if (gameState === 'playing' && event.key === ' ') {
@@ -3457,8 +3455,13 @@ function onKeyDown(event) {
         // Only toggle pause if instructions are not visible
         if (!isInstructionsVisible) {
             isPaused = !isPaused;
-            pauseScreen.style.display = isPaused ? 'block' : 'none';
-            menuElement.style.display = isPaused ? 'block' : 'none';
+            if (isPaused) {
+                ui.showPauseScreen();
+                ui.showMenu();
+            } else {
+                ui.hidePauseScreen();
+                ui.hideScreen('menu');
+            }
             updateStartButtonText();
 
             if (!isPaused) {
@@ -3475,7 +3478,7 @@ function onKeyDown(event) {
 }
 
 function onKeyUp(event) {
-    keyState[event.key] = false;
+    inputHandler.keyState[event.key] = false;
 }
 
 function onMouseClick() {
@@ -3539,18 +3542,14 @@ function activateBomb() {
 // --- Apply Game Settings ---
 function applyGameSettings() {
     // Get selected settings
-    const selectedSpeed = speedSelect.value;
-    const selectedDifficulty = difficultySelect.value;
-    const selectedWebType = webTypeSelect.value;
-    const selectedTubeWidth = tubeWidthSelect.value;
-    const selectedLives = livesSelect.value;
+    const selectedValues = ui.getSelectedValues();
 
     // Apply settings
-    setGameSettings(selectedSpeed, selectedDifficulty, selectedWebType, selectedTubeWidth, selectedLives);
+    setGameSettings(selectedValues.speed, selectedValues.difficulty, selectedValues.webType, selectedValues.tubeWidth, selectedValues.lives);
 
     // Recreate the web if the web type has changed
-    if (webType !== selectedWebType) {
-        createWeb(selectedWebType);
+    if (webType !== selectedValues.webType) {
+        createWeb(selectedValues.webType);
         // Reset player position after new web creation
         playerCurrentLaneIndex = Math.floor(NUM_LANES / 2);
         updatePlayerPosition();
@@ -3615,8 +3614,9 @@ function changeShipType(newShipType) {
         shipType = newShipType;
 
         // Update dropdown in case this was called programmatically
-        if (shipSelect.value !== newShipType) {
-            shipSelect.value = newShipType;
+        const currentShipType = ui.getSelectedValues().shipType;
+        if (currentShipType !== newShipType) {
+            ui.setSelectedValues({ shipType: newShipType });
         }
 
         // Recreate the player with the new ship type
@@ -3631,74 +3631,22 @@ function changeShipType(newShipType) {
 
 // --- Leaderboard Functions ---
 
-// Load leaderboard from localStorage
-// Load leaderboard from API with localStorage fallback
+// Load leaderboard from API with localStorage fallback (deprecated)
 async function loadLeaderboard() {
-    try {
-        const response = await fetch('/api/leaderboard');
-        if (!response.ok) throw new Error('Failed to fetch leaderboard');
-
-        const data = await response.json();
-        leaderboard = data;
-
-        // Cache in localStorage as backup
-        try {
-            localStorage.setItem(STORAGE_KEY_LEADERBOARD, JSON.stringify(leaderboard));
-        } catch (storageError) {
-            console.error('Error saving to localStorage:', storageError);
-        }
-    } catch (e) {
-        console.error('Failed to load leaderboard from API:', e);
-
-        // Fall back to local storage if API is unavailable
-        try {
-            const savedLeaderboard = localStorage.getItem(STORAGE_KEY_LEADERBOARD);
-            if (savedLeaderboard) {
-                leaderboard = JSON.parse(savedLeaderboard);
-            } else {
-                // Initialize with default values if nothing exists
-                leaderboard = [
-                    {initials: 'CPU', score: 5000},
-                    {initials: 'BOT', score: 4000},
-                    {initials: 'AI', score: 3000},
-                    {initials: 'PRO', score: 2000},
-                    {initials: 'MAX', score: 1000}
-                ];
-                // Save defaults to localStorage
-                localStorage.setItem(STORAGE_KEY_LEADERBOARD, JSON.stringify(leaderboard));
-            }
-        } catch (storageError) {
-            console.error('Error accessing localStorage:', storageError);
-            leaderboard = [];
-        }
-    }
+    // This function is deprecated - use leaderboardManager.loadLeaderboard() instead
+    return await leaderboardManager.loadLeaderboard();
 }
 
-// Save leaderboard to localStorage (used as a backup)
+// Save leaderboard to localStorage (deprecated - use LeaderboardManager instead)
 function saveLeaderboard() {
-    try {
-        localStorage.setItem(STORAGE_KEY_LEADERBOARD, JSON.stringify(leaderboard));
-    } catch (e) {
-        console.error('Failed to save leaderboard to localStorage:', e);
-    }
+    // This function is deprecated - LeaderboardManager handles persistence
+    leaderboardManager.saveLeaderboard();
 }
 
 // Check if the current score qualifies for the leaderboard
 function checkHighScore(currentScore) {
-    // No entries yet or score is higher than the lowest score
-    if (leaderboard.length < 10 || currentScore > leaderboard[leaderboard.length - 1].score) {
-        // Find where to insert the new score
-        newScoreRank = 0;
-        while (newScoreRank < leaderboard.length && leaderboard[newScoreRank].score >= currentScore) {
-            newScoreRank++;
-        }
-
-        isNewHighScore = true;
-        return true;
-    }
-
-    isNewHighScore = false;
-    return false;
+    // This function is deprecated - use leaderboardManager.checkHighScore() instead
+    return leaderboardManager.checkHighScore(currentScore);
 }
 
 // Add a new score to the leaderboard via API
@@ -3722,20 +3670,16 @@ async function addScoreToLeaderboard(initials, currentScore) {
         const result = await response.json();
 
         if (result.success) {
-            // Update local leaderboard with the one from the server
-            leaderboard = result.leaderboard;
+            // Update local leaderboard with the one from the server (deprecated)
+            // leaderboard = result.leaderboard;
 
-            // Highlight the new score
-            if (result.rank !== null) {
-                newScoreRank = result.rank;
-                isNewHighScore = true;
-            }
+            // This function is deprecated - the LeaderboardManager handles this now
 
-            // Update the UI
-            renderLeaderboard();
+            // Update the UI (deprecated - use LeaderboardManager instead)
+            const leaderboardHTML = leaderboardManager.generateLeaderboardHTML();
+            ui.updateLeaderboard(leaderboardHTML, false);
 
-            // Also update local storage as backup
-            saveLeaderboard();
+            // Local storage is now handled by LeaderboardManager
 
             return true;
         } else {
@@ -3745,23 +3689,16 @@ async function addScoreToLeaderboard(initials, currentScore) {
     } catch (e) {
         console.error('Error submitting score to API:', e);
 
-        // Fall back to local storage if API is unavailable
-        // Insert the new score at the correct position
-        leaderboard.splice(newScoreRank, 0, {
-            initials: formattedInitials,
-            score: currentScore
-        });
+        // Fall back to local storage if API is unavailable (deprecated)
+        // This function is deprecated - use leaderboardManager.addScoreLocally() instead
+        console.warn('API unavailable, but this fallback is deprecated');
 
-        // Keep only the top 10 scores
-        if (leaderboard.length > 10) {
-            leaderboard = leaderboard.slice(0, 10);
-        }
-
-        // Save to local storage as backup
-        saveLeaderboard();
+        // Use LeaderboardManager for local fallback
+        const localResult = leaderboardManager.addScoreLocally(formattedInitials, currentScore);
 
         // Update the UI
-        renderLeaderboard();
+        const leaderboardHTML = leaderboardManager.generateLeaderboardHTML();
+        ui.updateLeaderboard(leaderboardHTML, false);
 
         return true;
     }
@@ -3785,8 +3722,9 @@ function renderLeaderboard(targetElement = leaderboardTable) {
     `;
 
     // Add table rows - show only top 5 leaders
-    leaderboard.slice(0, 5).forEach((entry, index) => {
-        const isHighlighted = (isNewHighScore && index === newScoreRank) ? 'highlight' : '';
+    leaderboardManager.getLeaderboard().slice(0, 5).forEach((entry, index) => {
+        const highScoreStatus = leaderboardManager.getHighScoreStatus();
+        const isHighlighted = (highScoreStatus.isNewHighScore && index === highScoreStatus.rank) ? 'highlight' : '';
         html += `
         <tr class="${isHighlighted}">
             <td>${index + 1}</td>
@@ -3808,39 +3746,41 @@ function renderLeaderboard(targetElement = leaderboardTable) {
 
 // Show the leaderboard modal
 function showLeaderboard() {
-    if (leaderboardModal) {
-        renderLeaderboard(modalLeaderboardTable);
-        leaderboardModal.style.display = 'block';
-    }
+    // Update leaderboard with latest data
+    const leaderboardHTML = leaderboardManager.generateLeaderboardHTML();
+    ui.updateLeaderboard(leaderboardHTML, true);
+    ui.showLeaderboardModal();
 }
 
 // Hide the leaderboard modal
 function hideLeaderboard() {
-    if (leaderboardModal) {
-        leaderboardModal.style.display = 'none';
-    }
+    ui.hideLeaderboardModal();
 }
 
 // Handle score submission
 async function handleScoreSubmit() {
-    if (playerInitialsInput && isNewHighScore) {
-        const initials = playerInitialsInput.value.trim();
+    const highScoreStatus = leaderboardManager.getHighScoreStatus();
+    if (highScoreStatus.isNewHighScore) {
+        const initials = ui.getPlayerInitials();
         if (initials) {
             // Disable submit button during submission
-            if (submitScoreButton) {
-                submitScoreButton.disabled = true;
-                submitScoreButton.textContent = 'SENDING...';
+            const submitButton = ui.getElement('submitScore');
+            if (submitButton) {
+                submitButton.disabled = true;
+                submitButton.textContent = 'SENDING...';
             }
 
             try {
                 // Add score to leaderboard (async)
-                const success = await addScoreToLeaderboard(initials, score);
+                const result = await leaderboardManager.addScoreToLeaderboard(initials, score);
+                const success = result.success;
 
                 if (success) {
                     // Hide form and reset
-                    highScoreForm.style.display = 'none';
-                    playerInitialsInput.value = '';
-                    isNewHighScore = false;
+                    const highScoreForm = ui.getElement('highScoreForm');
+                    if (highScoreForm) highScoreForm.style.display = 'none';
+                    ui.setPlayerInitials('');
+                    leaderboardManager.resetHighScoreStatus();
 
                     // Play a sound if available
                     if (sounds && sounds.playSound) {
@@ -3854,17 +3794,20 @@ async function handleScoreSubmit() {
                 alert('An error occurred while submitting your score.');
             } finally {
                 // Re-enable submit button
-                if (submitScoreButton) {
-                    submitScoreButton.disabled = false;
-                    submitScoreButton.textContent = 'SUBMIT';
+                if (submitButton) {
+                    submitButton.disabled = false;
+                    submitButton.textContent = 'SUBMIT';
                 }
             }
         } else {
             // Flash the input if empty
-            playerInitialsInput.style.backgroundColor = 'rgba(255, 0, 0, 0.5)';
-            setTimeout(() => {
-                playerInitialsInput.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
-            }, 300);
+            const playerInitialsInput = ui.getElement('playerInitials');
+            if (playerInitialsInput) {
+                playerInitialsInput.style.backgroundColor = 'rgba(255, 0, 0, 0.5)';
+                setTimeout(() => {
+                    playerInitialsInput.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+                }, 300);
+            }
         }
     }
 }
@@ -3884,4 +3827,6 @@ if (gameFullscreenToggleButton) {
 updateFullscreenToggleButton();
 
 // --- Start the Game ---
-init();
+console.log('Initializing');
+await init();
+console.log('Initialized');
